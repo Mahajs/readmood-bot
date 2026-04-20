@@ -42,6 +42,18 @@ function createBookIdentity(title, author) {
   return `${normalizeText(title)}::${normalizeText(author)}`;
 }
 
+function countQueryWordsMatch(query, ...values) {
+  const words = normalizeText(query).split(" ").filter(Boolean);
+  const haystack = normalizeText(values.join(" "));
+
+  return words.filter((word) => haystack.includes(word)).length;
+}
+
+function looksLikeAuthorQuery(query) {
+  const words = normalizeText(query).split(" ").filter(Boolean);
+  return words.length >= 2;
+}
+
 function buildSearchQuery(preferences) {
   const parts = new Set();
 
@@ -99,6 +111,46 @@ function mapGoogleBook(item, recommendationText) {
   };
 }
 
+function scoreGoogleBook(item, query) {
+  const info = item.volumeInfo || {};
+  const title = info.title || "";
+  const subtitle = info.subtitle || "";
+  const authors = Array.isArray(info.authors) ? info.authors.join(" ") : "";
+  const categories = Array.isArray(info.categories) ? info.categories.join(" ") : "";
+  const description = info.description || "";
+  const normalizedQuery = normalizeText(query);
+  let score = 0;
+
+  if (normalizeText(title).includes(normalizedQuery)) {
+    score += 12;
+  }
+
+  if (normalizeText(subtitle).includes(normalizedQuery)) {
+    score += 6;
+  }
+
+  if (normalizeText(authors).includes(normalizedQuery)) {
+    score += 14;
+  }
+
+  score += countQueryWordsMatch(query, title, subtitle, authors) * 3;
+  score += countQueryWordsMatch(query, categories, description);
+
+  if (looksLikeAuthorQuery(query) && normalizeText(authors).includes(normalizedQuery)) {
+    score += 10;
+  }
+
+  if (
+    looksLikeAuthorQuery(query) &&
+    !normalizeText(authors).includes(normalizedQuery) &&
+    countQueryWordsMatch(query, authors) === 0
+  ) {
+    score -= 8;
+  }
+
+  return score;
+}
+
 async function fetchGoogleBooks(params) {
   const apiKey = ensureApiKey();
   const query = new URLSearchParams({ ...params, key: apiKey });
@@ -141,16 +193,27 @@ async function searchGoogleBooksByText(query, options = {}) {
   }
 
   const limit = Math.min(options.limit || 5, 40);
+  const searchQuery = looksLikeAuthorQuery(trimmedQuery)
+    ? `inauthor:${trimmedQuery}`
+    : trimmedQuery;
   const data = await fetchGoogleBooks({
-    q: trimmedQuery,
+    q: searchQuery,
     langRestrict: "ru",
     printType: "books",
     orderBy: "relevance",
     projection: "lite",
-    maxResults: String(limit)
+    maxResults: String(limit * 3)
   });
 
-  return (data.items || []).map((item) => mapGoogleBook(item));
+  return (data.items || [])
+    .map((item) => ({
+      item,
+      score: scoreGoogleBook(item, trimmedQuery)
+    }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ item }) => mapGoogleBook(item));
 }
 
 module.exports = {
