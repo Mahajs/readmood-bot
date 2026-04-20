@@ -1,0 +1,25 @@
+{
+  "name": "book-recommendation-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for book recommendations based on user preferences.",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "set-webhook": "node scripts/set-webhook.js",
+    "delete-webhook": "node scripts/delete-webhook.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "books",
+    "recommendations"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}

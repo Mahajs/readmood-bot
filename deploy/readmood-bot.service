@@ -1,0 +1,16 @@
+[Unit]
+Description=ReadMood Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=readmood
+WorkingDirectory=/opt/readmood-bot
+ExecStart=/usr/bin/node /opt/readmood-bot/src/index.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/readmood-bot/.env
+
+[Install]
+WantedBy=multi-user.target
