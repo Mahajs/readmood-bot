@@ -1,13 +1,13 @@
 # Telegram Book Recommendation Bot
 
-Telegram-бот на JavaScript для подбора книг по параметрам и поиска по локальной базе + Open Library.
+Telegram-бот на JavaScript для подбора книг по параметрам и поиска по локальной базе + Google Books.
 
 ## Что умеет
 
 - подбор книг по формату, жанру, настроению, длине и цели чтения
 - поиск по названию и автору через `/find`
 - локальные рекомендации с твоими живыми описаниями
-- внешние результаты из Open Library
+- внешние результаты из Google Books
 
 ## Архитектура после перехода на webhook
 
@@ -51,7 +51,7 @@ Telegram-бот на JavaScript для подбора книг по параме
 - `src/index.js` — локальный запуск в polling-режиме
 - `src/bot.js` — общая логика бота, stateless-опрос и обработка update
 - `src/services/recommender.js` — алгоритм рекомендаций
-- `src/services/openLibrary.js` — работа с Open Library
+- `src/services/googleBooks.js` — работа с Google Books API
 - `src/data/books.js` — локальная база книг
 - `api/telegram-webhook.js` — Vercel webhook endpoint
 - `scripts/set-webhook.js` — регистрация webhook в Telegram
@@ -78,7 +78,7 @@ cp .env.example .env
 
 ```env
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-OPEN_LIBRARY_CONTACT_EMAIL=your_email@example.com
+GOOGLE_BOOKS_API_KEY=your_google_books_api_key_here
 WEBHOOK_BASE_URL=https://your-project.vercel.app
 TELEGRAM_WEBHOOK_SECRET=replace_with_random_secret
 ```
@@ -89,7 +89,7 @@ TELEGRAM_WEBHOOK_SECRET=replace_with_random_secret
 
 Желательные:
 
-- `OPEN_LIBRARY_CONTACT_EMAIL`
+- `GOOGLE_BOOKS_API_KEY`
 - `WEBHOOK_BASE_URL`
 - `TELEGRAM_WEBHOOK_SECRET`
 
@@ -184,7 +184,7 @@ git commit -m "Prepare bot for Vercel webhook deployment"
 В Vercel Project Settings -> `Environment Variables` добавь:
 
 - `TELEGRAM_BOT_TOKEN`
-- `OPEN_LIBRARY_CONTACT_EMAIL`
+- `GOOGLE_BOOKS_API_KEY`
 - `WEBHOOK_BASE_URL`
 - `TELEGRAM_WEBHOOK_SECRET`
 
@@ -192,7 +192,7 @@ git commit -m "Prepare bot for Vercel webhook deployment"
 
 ```env
 TELEGRAM_BOT_TOKEN=...
-OPEN_LIBRARY_CONTACT_EMAIL=your_email@example.com
+GOOGLE_BOOKS_API_KEY=your_google_books_api_key_here
 WEBHOOK_BASE_URL=https://your-project.vercel.app
 TELEGRAM_WEBHOOK_SECRET=some_long_random_secret
 ```

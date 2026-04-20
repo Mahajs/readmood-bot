@@ -171,6 +171,7 @@ async function sendStep(bot, chatId, session) {
 
   if (!nextStep) {
     const preferences = buildPreferences(session);
+    console.log("Sending final recommendation", { chatId, preferences });
     const recommendations = await recommendBooks(preferences);
     const message = buildRecommendationMessage(preferences, recommendations);
 
@@ -181,6 +182,7 @@ async function sendStep(bot, chatId, session) {
     return;
   }
 
+  console.log("Sending next step", { chatId, step: nextStep.key, session });
   await bot.sendMessage(chatId, nextStep.question, {
     reply_markup: {
       inline_keyboard: buildStepKeyboard(nextStep, session)
@@ -202,6 +204,7 @@ function extractCommandArgument(text) {
 }
 
 async function handleStart(bot, chatId) {
+  console.log("Handling /start", { chatId });
   await bot.sendMessage(
     chatId,
     [
@@ -214,12 +217,14 @@ async function handleStart(bot, chatId) {
 }
 
 async function handleRestart(bot, chatId) {
+  console.log("Handling /restart", { chatId });
   await bot.sendMessage(chatId, "Начинаем заново.");
   await sendStep(bot, chatId, createEmptySession());
 }
 
 async function handleFind(bot, chatId, text) {
   const query = extractCommandArgument(text);
+  console.log("Handling /find", { chatId, query });
 
   if (!query) {
     await bot.sendMessage(
@@ -236,6 +241,7 @@ async function handleFind(bot, chatId, text) {
 }
 
 async function handleHelp(bot, chatId) {
+  console.log("Handling /help", { chatId });
   await bot.sendMessage(
     chatId,
     [
@@ -250,11 +256,17 @@ async function handleHelp(bot, chatId) {
 
 async function handleMessage(bot, message) {
   if (!message?.chat?.id || !message.text) {
+    console.log("Skipping message without chatId/text");
     return;
   }
 
   const chatId = message.chat.id;
   const command = extractCommand(message.text);
+  console.log("Received message", {
+    chatId,
+    text: message.text,
+    command
+  });
 
   if (command === "/start") {
     await handleStart(bot, chatId);
@@ -279,17 +291,28 @@ async function handleMessage(bot, message) {
 async function handleCallbackQuery(bot, query) {
   const chatId = query?.message?.chat?.id;
   const data = query?.data || "";
+  console.log("Received callback query", {
+    chatId,
+    data
+  });
 
   if (!chatId || !data.startsWith(callbackPrefix)) {
+    console.log("Ignoring callback query", { chatId, data });
     return;
   }
 
   const session = deserializeSession(data.slice(callbackPrefix.length));
+  console.log("Decoded callback session", { chatId, session });
   await bot.answerCallbackQuery(query.id);
   await sendStep(bot, chatId, session);
 }
 
 async function handleTelegramUpdate(bot, update) {
+  console.log("Handling telegram update", {
+    hasMessage: Boolean(update?.message),
+    hasCallbackQuery: Boolean(update?.callback_query)
+  });
+
   if (update.message) {
     await handleMessage(bot, update.message);
   }

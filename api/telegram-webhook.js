@@ -25,6 +25,13 @@ module.exports = async (req, res) => {
   }
 
   try {
+    console.log("Webhook request received", {
+      hasBody: Boolean(req.body),
+      updateKeys: req.body ? Object.keys(req.body) : [],
+      hasMessage: Boolean(req.body?.message),
+      hasCallbackQuery: Boolean(req.body?.callback_query)
+    });
+
     const bot = getWebhookBot(token);
     await handleTelegramUpdate(bot, req.body);
     res.status(200).json({ ok: true });

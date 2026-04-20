@@ -1,9 +1,9 @@
 const { books } = require("../data/books");
 const {
-  searchOpenLibrary,
-  searchOpenLibraryByText,
+  searchGoogleBooks,
+  searchGoogleBooksByText,
   createBookIdentity
-} = require("./openLibrary");
+} = require("./googleBooks");
 
 function normalizeText(value) {
   return String(value || "")
@@ -84,7 +84,7 @@ async function recommendBooks(preferences, options = {}) {
   let externalError = null;
 
   try {
-    const externalBooks = await searchOpenLibrary(preferences, {
+    const externalBooks = await searchGoogleBooks(preferences, {
       limit: externalLimit * 2
     });
     const localIds = new Set(
@@ -115,7 +115,7 @@ async function findBooks(query, options = {}) {
   let externalError = null;
 
   try {
-    const remoteResults = await searchOpenLibraryByText(query, {
+    const remoteResults = await searchGoogleBooksByText(query, {
       limit: externalLimit * 2
     });
     const localIds = new Set(
@@ -179,7 +179,7 @@ function buildRecommendationMessage(preferences, recommendationSet) {
   if (externalRecommendations.length) {
     blocks.push(
       [
-        "Еще варианты из Open Library:",
+        "Еще варианты из Google Books:",
         externalRecommendations
           .map(
             (book, index) =>
@@ -192,7 +192,7 @@ function buildRecommendationMessage(preferences, recommendationSet) {
 
   if (externalError) {
     blocks.push(
-      "Внешняя база Open Library сейчас временно недоступна, поэтому показаны только локальные рекомендации."
+      "Внешняя база Google Books сейчас временно недоступна, поэтому показаны только локальные рекомендации."
     );
   }
 
@@ -228,7 +228,7 @@ function buildFindBooksMessage(query, searchResult) {
   if (externalResults.length) {
     blocks.push(
       [
-        "Во внешней базе Open Library:",
+        "Во внешней базе Google Books:",
         externalResults
           .map(
             (book, index) =>
@@ -241,7 +241,7 @@ function buildFindBooksMessage(query, searchResult) {
 
   if (externalError) {
     blocks.push(
-      "Open Library сейчас временно недоступна, поэтому показаны только локальные результаты."
+      "Google Books сейчас временно недоступна, поэтому показаны только локальные результаты."
     );
   }
 
