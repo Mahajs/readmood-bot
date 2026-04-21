@@ -70,13 +70,35 @@ const paceToLegacyMoodMap = {
   very_fast: ["приключенческое"]
 };
 
-const heavyThemes = [
-  "травма",
+const heavySafeThemes = [
   "саморазрушение",
-  "потеря",
-  "насилие",
-  "одиночество"
+  "травма",
+  "страх",
+  "отчуждение"
 ];
+
+const comfortVibes = ["cozy", "warm", "light", "uplifting", "neutral"];
+const difficultSafeVibes = ["dark", "melancholic"];
+const cozySafeVibes = ["cozy", "warm", "light"];
+const cozyUnsafeVibes = ["melancholic", "dark", "tense"];
+
+const directHeavyRequests = ["emotional", "reflective"];
+
+function getBookVibes(book) {
+  return Array.isArray(book.vibe) ? book.vibe : [];
+}
+
+function allowsMelancholicSafe(preferences) {
+  return preferences.vibe === "melancholic";
+}
+
+function allowsHeavySafeThemes(preferences) {
+  return (
+    preferences.vibe === "melancholic" ||
+    preferences.vibe === "tense" ||
+    directHeavyRequests.includes(preferences.goal)
+  );
+}
 
 const randomRecommendationPlan = {
   exact: ["Цветы для Элджернона", "Хоббит, или Туда и обратно", "Кухня"],
@@ -189,12 +211,72 @@ function isSlowPaced(book) {
   return book.pace === "slow" || book.pace === "медленная";
 }
 
-function hasHeavyThemes(book) {
-  return intersects(book.themes, heavyThemes);
+function hasTooManyHeavySafeThemes(book, preferences) {
+  if (allowsHeavySafeThemes(preferences) || !Array.isArray(book.themes)) {
+    return false;
+  }
+
+  const heavyThemeCount = book.themes.filter((theme) =>
+    heavySafeThemes.includes(theme)
+  ).length;
+
+  return heavyThemeCount > 0 && heavyThemeCount >= Math.ceil(book.themes.length / 2);
 }
 
-function isSafeBook(book) {
-  return !isHighComplexity(book) && !isSlowPaced(book) && !hasHeavyThemes(book);
+function hasDifficultSafeVibe(book, preferences) {
+  const vibes = getBookVibes(book);
+
+  if (vibes.includes("dark")) {
+    return true;
+  }
+
+  return vibes.includes("melancholic") && !allowsMelancholicSafe(preferences);
+}
+
+function isSafeBook(book, preferences) {
+  return (
+    !isHighComplexity(book) &&
+    !isSlowPaced(book) &&
+    !hasDifficultSafeVibe(book, preferences) &&
+    !hasTooManyHeavySafeThemes(book, preferences)
+  );
+}
+
+function getSafeScore(book, preferences) {
+  const vibes = getBookVibes(book);
+  let safeScore = book.score;
+
+  if (intersects(vibes, comfortVibes)) {
+    safeScore += 2;
+  }
+
+  if (preferences.vibe === "cozy" && intersects(vibes, cozySafeVibes)) {
+    safeScore += 3;
+  }
+
+  if (preferences.vibe === "cozy" && intersects(vibes, cozyUnsafeVibes)) {
+    safeScore -= 3;
+  }
+
+  if (intersects(vibes, difficultSafeVibes)) {
+    safeScore -= 2;
+  }
+
+  if (book.complexity === "low") {
+    safeScore += 1;
+  }
+
+  if (book.pace === "fast") {
+    safeScore += 1;
+  }
+
+  return safeScore;
+}
+
+function sortSafeCandidates(candidates, preferences) {
+  return [...candidates].sort(
+    (a, b) => getSafeScore(b, preferences) - getSafeScore(a, preferences)
+  );
 }
 
 function hasDifferentTasteVector(book, exactBook) {
@@ -274,10 +356,21 @@ function buildRoleRecommendations(preferences) {
 
   const safe =
     pickFirstUnique(
-      scoredBooks.filter((book) => book.score >= 3 && isSafeBook(book)),
+      sortSafeCandidates(
+        scoredBooks.filter(
+          (book) => book.score >= 3 && isSafeBook(book, preferences)
+        ),
+        preferences
+      ),
       usedIds
     ) ||
-    pickFirstUnique(scoredBooks.filter((book) => isSafeBook(book)), usedIds);
+    pickFirstUnique(
+      sortSafeCandidates(
+        scoredBooks.filter((book) => isSafeBook(book, preferences)),
+        preferences
+      ),
+      usedIds
+    );
 
   if (safe) {
     usedIds.add(createBookIdentity(safe.title, safe.author));
