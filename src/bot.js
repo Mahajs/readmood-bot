@@ -168,7 +168,7 @@ function buildStepKeyboard(step, session) {
 
 function buildStartKeyboard() {
   return [
-    [{ text: "📖 Начать подбор", callback_data: "start_pick" }],
+    [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
     [{ text: "📚 Найти книгу", callback_data: "start_find" }],
     [{ text: "✨ Подборки", callback_data: "start_collections" }],
     [{ text: "ℹ️ Как это работает", callback_data: "start_help" }],
