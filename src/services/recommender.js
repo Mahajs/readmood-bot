@@ -101,10 +101,33 @@ function allowsHeavySafeThemes(preferences) {
 }
 
 const randomRecommendationPlan = {
-  exact: ["Цветы для Элджернона", "Хоббит, или Туда и обратно", "Кухня"],
-  safe: ["Вторая жизнь Уве", "Кухня", "Автостопом по галактике"],
-  stretch: ["Человек-комбини", "Женщина в песках", "Кокоро"]
+  exact: [
+    "Цветы для Элджернона",
+    "Хоббит, или Туда и обратно",
+    "Кухня",
+    "Полночная библиотека",
+    "Вторая жизнь Уве",
+    "Гарри Поттер и философский камень"
+  ],
+  safe: [
+    "Вторая жизнь Уве",
+    "Хоббит, или Туда и обратно",
+    "Гарри Поттер и философский камень",
+    "Марсианин",
+    "Автостопом по галактике",
+    "Чудеса универсама «Намиа»"
+  ],
+  stretch: [
+    "Человек-комбини",
+    "Жертва подозреваемого X",
+    "Кафка на пляже",
+    "Имя ветра",
+    "Ваш покорный слуга кот",
+    "Проект «Аве Мария»"
+  ]
 };
+
+const randomTopLimit = 6;
 
 function intersects(values, candidates) {
   if (!Array.isArray(values) || !Array.isArray(candidates)) {
@@ -299,34 +322,50 @@ function pickFirstUnique(candidates, usedIds) {
   });
 }
 
+function pickRandomFromTop(candidates, usedIds, topLimit = randomTopLimit) {
+  const availableCandidates = candidates.filter((book) => {
+    const id = createBookIdentity(book.title, book.author);
+    return !usedIds.has(id);
+  });
+  const topCandidates = availableCandidates.slice(0, topLimit);
+
+  if (!topCandidates.length) {
+    return null;
+  }
+
+  const randomIndex = Math.floor(Math.random() * topCandidates.length);
+  return topCandidates[randomIndex];
+}
+
 function findBookByTitle(title) {
   return books.find((book) => book.title === title);
 }
 
 function pickRandomRecommendations() {
   const usedIds = new Set();
-  const exact = pickFirstUnique(
-    randomRecommendationPlan.exact.map(findBookByTitle).filter(Boolean),
-    usedIds
-  );
+  const randomPreferences = { goal: "random", vibe: "any" };
+  const exactCandidates = randomRecommendationPlan.exact
+    .map(findBookByTitle)
+    .filter(Boolean);
+  const safeCandidates = randomRecommendationPlan.safe
+    .map(findBookByTitle)
+    .filter((book) => book && isSafeBook(book, randomPreferences));
+  const stretchCandidates = randomRecommendationPlan.stretch
+    .map(findBookByTitle)
+    .filter((book) => book && !isHighComplexity(book));
+  const exact = pickRandomFromTop(exactCandidates, usedIds);
 
   if (exact) {
     usedIds.add(createBookIdentity(exact.title, exact.author));
   }
 
-  const safe = pickFirstUnique(
-    randomRecommendationPlan.safe.map(findBookByTitle).filter(Boolean),
-    usedIds
-  );
+  const safe = pickRandomFromTop(safeCandidates, usedIds);
 
   if (safe) {
     usedIds.add(createBookIdentity(safe.title, safe.author));
   }
 
-  const stretch = pickFirstUnique(
-    randomRecommendationPlan.stretch.map(findBookByTitle).filter(Boolean),
-    usedIds
-  );
+  const stretch = pickRandomFromTop(stretchCandidates, usedIds);
 
   return {
     exact,
