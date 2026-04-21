@@ -166,6 +166,15 @@ function buildStepKeyboard(step, session) {
   );
 }
 
+function buildStartKeyboard() {
+  return [
+    [{ text: "📗 Подобрать книгу", callback_data: "start_pick" }],
+    [{ text: "📚 Найти книгу", callback_data: "start_find" }],
+    [{ text: "✨ Подборки", callback_data: "start_collections" }],
+    [{ text: "ℹ️ Как это работает", callback_data: "start_help" }]
+  ];
+}
+
 async function sendStep(bot, chatId, session) {
   const nextStep = getNextStep(session);
 
@@ -208,12 +217,16 @@ async function handleStart(bot, chatId) {
   await bot.sendMessage(
     chatId,
     [
-      "Привет! Я помогу подобрать книги по твоим предпочтениям.",
-      "Мы пройдем короткий опрос, а потом я предложу несколько вариантов."
-    ].join("\n\n")
+      "Привет. Я ReadMoodBot.",
+      "Помогаю подобрать книгу под твое состояние: настроение, жанр и то, чего тебе сейчас хочется от чтения.",
+      "Можно ответить на пару вопросов, найти конкретную книгу или посмотреть готовые рекомендации."
+    ].join("\n\n"),
+    {
+      reply_markup: {
+        inline_keyboard: buildStartKeyboard()
+      }
+    }
   );
-
-  await sendStep(bot, chatId, createEmptySession());
 }
 
 async function handleRestart(bot, chatId) {
@@ -296,7 +309,42 @@ async function handleCallbackQuery(bot, query) {
     data
   });
 
-  if (!chatId || !data.startsWith(callbackPrefix)) {
+  if (!chatId) {
+    console.log("Ignoring callback query", { chatId, data });
+    return;
+  }
+
+  if (data === "start_pick") {
+    await bot.answerCallbackQuery(query.id);
+    await sendStep(bot, chatId, createEmptySession());
+    return;
+  }
+
+  if (data === "start_find") {
+    await bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(
+      chatId,
+      "Напиши автора, название книги или используй команду /find"
+    );
+    return;
+  }
+
+  if (data === "start_collections") {
+    await bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(chatId, "Подборки скоро появятся.");
+    return;
+  }
+
+  if (data === "start_help") {
+    await bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(
+      chatId,
+      "Я помогаю подобрать книгу по настроению, жанру и читательскому запросу."
+    );
+    return;
+  }
+
+  if (!data.startsWith(callbackPrefix)) {
     console.log("Ignoring callback query", { chatId, data });
     return;
   }
