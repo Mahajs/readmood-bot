@@ -7,7 +7,14 @@ const genreKeywords = {
   психология: ["subject:psychology"],
   история: ["subject:history"],
   саморазвитие: ["subject:self-help"],
-  продуктивность: ["subject:productivity", "subject:time management"]
+  продуктивность: ["subject:productivity", "subject:time management"],
+  novel: ["subject:fiction", "intitle:roman"],
+  detective: ["subject:detective"],
+  fantasy: ["subject:fantasy"],
+  "sci-fi": ["subject:science fiction"],
+  "non-fiction": ["subject:nonfiction"],
+  contemporary: ["subject:fiction"],
+  classic: ["subject:classic"]
 };
 
 const moodKeywords = {
@@ -18,7 +25,12 @@ const moodKeywords = {
   приключенческое: ["subject:adventure"],
   мотивирующее: ["subject:motivation"],
   мрачное: ["subject:dystopia"],
-  обнадеживающее: ["subject:hope"]
+  обнадеживающее: ["subject:hope"],
+  cozy: ["subject:family"],
+  tense: ["subject:thriller"],
+  light: ["subject:humor"],
+  melancholic: ["subject:relationships"],
+  mysterious: ["subject:mystery"]
 };
 
 const goalKeywords = {
@@ -27,7 +39,13 @@ const goalKeywords = {
   подумать: ["subject:ideas"],
   вдохновиться: ["subject:inspiration"],
   "погрузиться в мир": ["subject:fiction"],
-  "стать эффективнее": ["subject:habits", "subject:productivity"]
+  "стать эффективнее": ["subject:habits", "subject:productivity"],
+  relax: ["subject:bestsellers"],
+  inspire: ["subject:inspiration"],
+  emotional: ["subject:relationships"],
+  reflective: ["subject:ideas"],
+  escape: ["subject:fiction"],
+  dynamic: ["subject:adventure"]
 };
 
 function normalizeText(value) {
@@ -65,6 +83,10 @@ function buildSearchQuery(preferences) {
     parts.add(keyword);
   }
 
+  for (const keyword of moodKeywords[preferences.vibe] || []) {
+    parts.add(keyword);
+  }
+
   for (const keyword of goalKeywords[preferences.goal] || []) {
     parts.add(keyword);
   }
@@ -75,6 +97,10 @@ function buildSearchQuery(preferences) {
 
   if (preferences.format === "нон-фикшн") {
     parts.add("-subject:fiction");
+  }
+
+  if (preferences.genre === "non-fiction") {
+    parts.add("subject:nonfiction");
   }
 
   return Array.from(parts).join(" ");

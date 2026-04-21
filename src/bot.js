@@ -13,96 +13,91 @@ const pollingBots = new Map();
 let webhookBot = null;
 
 const optionCatalog = {
-  format: {
-    h: { label: "Историю, в которую можно погрузиться", value: "художественная" },
-    n: { label: "Что-то полезное и про реальную жизнь", value: "нон-фикшн" },
+  goal: {
+    rl: { label: "Отдохнуть и отвлечься", value: "relax" },
+    in: { label: "Вдохновиться", value: "inspire" },
+    em: { label: "Попереживать", value: "emotional" },
+    rf: { label: "Подумать о жизни", value: "reflective" },
+    es: { label: "Погрузиться в другой мир", value: "escape" },
+    dy: { label: "Хочется динамики", value: "dynamic" },
+    ra: { label: "Не знаю, просто посоветуй что-нибудь", value: "random" },
+  },
+  vibe: {
+    cz: { label: "Уютная", value: "cozy" },
+    te: { label: "Напряженная", value: "tense" },
+    li: { label: "Светлая", value: "light" },
+    ml: { label: "Меланхоличная", value: "melancholic" },
+    my: { label: "Таинственная", value: "mysterious" },
+    an: { label: "Не важно", value: "any" },
   },
   genre: {
-    sf: { label: "Что-то умное и фантастическое", value: "фантастика" },
-    fa: { label: "Магию, мифы или другой мир", value: "фэнтези" },
-    ps: { label: "Про людей и внутренние процессы", value: "психология" },
-    hi: { label: "Про историю, культуру или общество", value: "история" },
-    sh: { label: "Для личной опоры и роста", value: "саморазвитие" },
-    fi: {
-      label: "Хорошую прозу без жесткого жанра",
-      value: "художественная литература",
-    },
-    pr: { label: "Для фокуса, привычек и дел", value: "продуктивность" },
+    nv: { label: "Роман", value: "novel" },
+    de: { label: "Детектив", value: "detective" },
+    fa: { label: "Фэнтези", value: "fantasy" },
+    sf: { label: "Фантастика", value: "sci-fi" },
+    nf: { label: "Нон-фикшн", value: "non-fiction" },
+    co: { label: "Современная проза", value: "contemporary" },
+    cl: { label: "Классика", value: "classic" },
+    an: { label: "Не принципиально", value: "any" },
   },
-  mood: {
-    li: { label: "Хочется чего-то легкого", value: "легкое" },
-    th: { label: "Хочется подумать", value: "вдумчивое" },
-    em: { label: "Хочется, чтобы задело", value: "эмоциональное" },
-    pa: { label: "Хочется пользы и ясности", value: "практичное" },
-    ad: { label: "Хочется движения и сюжета", value: "приключенческое" },
-    mo: { label: "Хочется собраться и ожить", value: "мотивирующее" },
+  pace: {
+    sl: { label: "Медленный", value: "slow" },
+    md: { label: "Средний", value: "medium" },
+    fs: { label: "Динамичный", value: "fast" },
+    vf: { label: "Очень динамичный", value: "very_fast" },
+    an: { label: "Не важно", value: "any" },
   },
   length: {
-    s: { label: "На пару вечеров", value: "короткая" },
-    m: { label: "Нормальный роман, без марафона", value: "средняя" },
-    l: { label: "Хочу надолго в это нырнуть", value: "длинная" },
-  },
-  goal: {
-    rl: { label: "Выдохнуть и переключиться", value: "отдохнуть" },
-    ln: { label: "Разобраться в чем-то новом", value: "узнать новое" },
-    rf: { label: "Остаться с мыслями после чтения", value: "подумать" },
-    in: { label: "Поймать вдохновение", value: "вдохновиться" },
-    im: { label: "Провалиться в атмосферу", value: "погрузиться в мир" },
-    ef: { label: "Собрать себя и дела", value: "стать эффективнее" },
+    sh: { label: "Короткая книга", value: "short" },
+    md: { label: "Средняя по объему", value: "medium" },
+    lg: { label: "Большая, чтобы надолго", value: "long" },
+    an: { label: "Не важно", value: "any" },
   },
 };
 
 const sessionSchema = [
-  { key: "format", short: "f" },
-  { key: "genre", short: "g" },
-  { key: "mood", short: "m" },
-  { key: "length", short: "l" },
   { key: "goal", short: "o" },
+  { key: "vibe", short: "v" },
+  { key: "genre", short: "g" },
+  { key: "pace", short: "p" },
+  { key: "length", short: "l" },
 ];
 
 const steps = [
   {
-    key: "format",
-    question: "Что тебе сейчас ближе?",
-    rows: [["h"], ["n"]],
+    key: "goal",
+    question: "Что тебе сейчас хочется получить от книги?",
+    rows: [["rl", "in"], ["em", "rf"], ["es", "dy"], ["ra"]],
+  },
+  {
+    key: "vibe",
+    question: "Какая атмосфера тебе сейчас ближе?",
+    rows: [["cz", "te"], ["li", "ml"], ["my", "an"]],
   },
   {
     key: "genre",
-    question: "В какую сторону смотрим?",
-    rows: [["sf", "fa"], ["ps", "hi"], ["sh", "fi"], ["pr"]],
+    question: "Какой жанр тебе ближе сегодня?",
+    rows: [["nv", "de"], ["fa", "sf"], ["nf", "co"], ["cl", "an"]],
   },
   {
-    key: "mood",
-    question: "Какого ощущения хочется от книги?",
-    rows: [
-      ["li", "th"],
-      ["em", "pa"],
-      ["ad", "mo"],
-    ],
+    key: "pace",
+    question: "Какой темп сюжета тебе нужен?",
+    rows: [["sl", "md"], ["fs", "vf"], ["an"]],
   },
   {
     key: "length",
-    question: "Сколько сейчас есть сил на чтение?",
-    rows: [["s", "m"], ["l"]],
-  },
-  {
-    key: "goal",
-    question: "Что книга должна сделать для тебя?",
-    rows: [
-      ["rl", "ln"],
-      ["rf", "in"],
-      ["im", "ef"],
-    ],
+    question: "Какой формат тебе удобнее?",
+    rows: [["sh", "md"], ["lg", "an"]],
   },
 ];
 
 function createEmptySession() {
   return {
-    format: null,
-    genre: null,
-    mood: null,
-    length: null,
     goal: null,
+    vibe: null,
+    genre: null,
+    pace: null,
+    length: null,
   };
 }
 
@@ -150,6 +145,10 @@ function buildPreferences(session) {
 }
 
 function getNextStep(session) {
+  if (session.goal === "ra") {
+    return null;
+  }
+
   return steps.find((step) => !session[step.key]);
 }
 
