@@ -7,6 +7,7 @@ const {
 } = require("./services/recommender");
 
 const callbackPrefix = "state:";
+const findPromptText = "Напиши автора, название книги или используй команду /find";
 const pollingBots = new Map();
 let webhookBot = null;
 
@@ -253,6 +254,20 @@ async function handleFind(bot, chatId, text) {
   await bot.sendMessage(chatId, message);
 }
 
+async function handleFindQuery(bot, chatId, query) {
+  const trimmedQuery = String(query || "").trim();
+
+  if (!trimmedQuery) {
+    await bot.sendMessage(chatId, findPromptText);
+    return;
+  }
+
+  await bot.sendMessage(chatId, `Ищу книги по запросу: ${trimmedQuery}`);
+  const searchResult = await findBooks(trimmedQuery);
+  const message = buildFindBooksMessage(trimmedQuery, searchResult);
+  await bot.sendMessage(chatId, message);
+}
+
 async function handleHelp(bot, chatId) {
   console.log("Handling /help", { chatId });
   await bot.sendMessage(
@@ -275,6 +290,8 @@ async function handleMessage(bot, message) {
 
   const chatId = message.chat.id;
   const command = extractCommand(message.text);
+  const isReplyToFindPrompt =
+    message.reply_to_message?.text === findPromptText;
   console.log("Received message", {
     chatId,
     text: message.text,
@@ -293,6 +310,11 @@ async function handleMessage(bot, message) {
 
   if (command === "/find") {
     await handleFind(bot, chatId, message.text);
+    return;
+  }
+
+  if (!command && isReplyToFindPrompt) {
+    await handleFindQuery(bot, chatId, message.text);
     return;
   }
 
@@ -324,7 +346,13 @@ async function handleCallbackQuery(bot, query) {
     await bot.answerCallbackQuery(query.id);
     await bot.sendMessage(
       chatId,
-      "Напиши автора, название книги или используй команду /find"
+      findPromptText,
+      {
+        reply_markup: {
+          force_reply: true,
+          input_field_placeholder: "Например: Осаму Дадзай"
+        }
+      }
     );
     return;
   }
