@@ -13,6 +13,32 @@ function normalizeText(value) {
     .trim();
 }
 
+const moodToVibeMap = {
+  легкое: ["легкая", "уютная", "теплая"],
+  вдумчивое: ["медитативная", "интеллектуальная", "созерцательная"],
+  эмоциональное: ["эмоциональная", "чувственная", "хрупкая"],
+  практичное: ["прикладная", "собранная", "структурная"],
+  приключенческое: ["динамичная", "захватывающая", "атмосферная"],
+  мотивирующее: ["ободряющая", "вдохновляющая", "энергичная"]
+};
+
+const goalToThemeMap = {
+  отдохнуть: ["уют", "дружба", "путешествие"],
+  "узнать новое": ["история", "общество", "идеи", "знания"],
+  подумать: ["одиночество", "смысл", "идентичность", "свобода"],
+  вдохновиться: ["надежда", "рост", "сила духа"],
+  "погрузиться в мир": ["мифология", "магия", "тайна", "мир"],
+  "стать эффективнее": ["привычки", "фокус", "дисциплина", "продуктивность"]
+};
+
+function intersects(values, candidates) {
+  if (!Array.isArray(values) || !Array.isArray(candidates)) {
+    return false;
+  }
+
+  return candidates.some((candidate) => values.includes(candidate));
+}
+
 function scoreBook(book, preferences) {
   let score = 0;
 
@@ -34,6 +60,24 @@ function scoreBook(book, preferences) {
 
   if (preferences.goal && book.goal.includes(preferences.goal)) {
     score += 3;
+  }
+
+  if (preferences.mood && intersects(book.vibe, moodToVibeMap[preferences.mood])) {
+    score += 2;
+  }
+
+  if (preferences.goal && intersects(book.themes, goalToThemeMap[preferences.goal])) {
+    score += 2;
+  }
+
+  if (preferences.length && book.pace) {
+    if (preferences.length === "короткая" && book.pace === "динамичная") {
+      score += 1;
+    }
+
+    if (preferences.length === "длинная" && book.pace === "медленная") {
+      score += 1;
+    }
   }
 
   return score;
@@ -60,7 +104,16 @@ function findLocalBooks(query, limit = 5) {
   return books
     .map((book) => {
       const haystack = normalizeText(
-        [book.title, book.author, book.description, book.recommendationText].join(" ")
+        [
+          book.title,
+          book.author,
+          book.description,
+          book.recommendationText,
+          ...(book.vibe || []),
+          ...(book.themes || []),
+          book.pace || "",
+          book.complexity || ""
+        ].join(" ")
       );
       const titleScore = normalizeText(book.title).includes(normalizedQuery) ? 5 : 0;
       const authorScore = normalizeText(book.author).includes(normalizedQuery) ? 4 : 0;
