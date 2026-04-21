@@ -3,18 +3,19 @@ const {
   recommendBooks,
   buildRecommendationMessage,
   findBooks,
-  buildFindBooksMessage
+  buildFindBooksMessage,
 } = require("./services/recommender");
 
 const callbackPrefix = "state:";
-const findPromptText = "Напиши автора, название книги или используй команду /find";
+const findPromptText =
+  "Напиши автора, название книги или используй команду /find";
 const pollingBots = new Map();
 let webhookBot = null;
 
 const optionCatalog = {
   format: {
     h: { label: "Художественная", value: "художественная" },
-    n: { label: "Нон-фикшн", value: "нон-фикшн" }
+    n: { label: "Нон-фикшн", value: "нон-фикшн" },
   },
   genre: {
     sf: { label: "Фантастика", value: "фантастика" },
@@ -22,8 +23,11 @@ const optionCatalog = {
     ps: { label: "Психология", value: "психология" },
     hi: { label: "История", value: "история" },
     sh: { label: "Саморазвитие", value: "саморазвитие" },
-    fi: { label: "Художественная литература", value: "художественная литература" },
-    pr: { label: "Продуктивность", value: "продуктивность" }
+    fi: {
+      label: "Художественная литература",
+      value: "художественная литература",
+    },
+    pr: { label: "Продуктивность", value: "продуктивность" },
   },
   mood: {
     li: { label: "Легкое", value: "легкое" },
@@ -31,12 +35,12 @@ const optionCatalog = {
     em: { label: "Эмоциональное", value: "эмоциональное" },
     pa: { label: "Практичное", value: "практичное" },
     ad: { label: "Приключенческое", value: "приключенческое" },
-    mo: { label: "Мотивирующее", value: "мотивирующее" }
+    mo: { label: "Мотивирующее", value: "мотивирующее" },
   },
   length: {
     s: { label: "Короткая", value: "короткая" },
     m: { label: "Средняя", value: "средняя" },
-    l: { label: "Длинная", value: "длинная" }
+    l: { label: "Длинная", value: "длинная" },
   },
   goal: {
     rl: { label: "Отдохнуть", value: "отдохнуть" },
@@ -44,8 +48,8 @@ const optionCatalog = {
     rf: { label: "Подумать", value: "подумать" },
     in: { label: "Вдохновиться", value: "вдохновиться" },
     im: { label: "Погрузиться в мир", value: "погрузиться в мир" },
-    ef: { label: "Стать эффективнее", value: "стать эффективнее" }
-  }
+    ef: { label: "Стать эффективнее", value: "стать эффективнее" },
+  },
 };
 
 const sessionSchema = [
@@ -53,24 +57,19 @@ const sessionSchema = [
   { key: "genre", short: "g" },
   { key: "mood", short: "m" },
   { key: "length", short: "l" },
-  { key: "goal", short: "o" }
+  { key: "goal", short: "o" },
 ];
 
 const steps = [
   {
     key: "format",
     question: "Для начала выбери формат книги:",
-    rows: [["h"], ["n"]]
+    rows: [["h"], ["n"]],
   },
   {
     key: "genre",
     question: "Теперь жанр:",
-    rows: [
-      ["sf", "fa"],
-      ["ps", "hi"],
-      ["sh", "fi"],
-      ["pr"]
-    ]
+    rows: [["sf", "fa"], ["ps", "hi"], ["sh", "fi"], ["pr"]],
   },
   {
     key: "mood",
@@ -78,13 +77,13 @@ const steps = [
     rows: [
       ["li", "th"],
       ["em", "pa"],
-      ["ad", "mo"]
-    ]
+      ["ad", "mo"],
+    ],
   },
   {
     key: "length",
     question: "Какую длину книги выбрать?",
-    rows: [["s", "m"], ["l"]]
+    rows: [["s", "m"], ["l"]],
   },
   {
     key: "goal",
@@ -92,9 +91,9 @@ const steps = [
     rows: [
       ["rl", "ln"],
       ["rf", "in"],
-      ["im", "ef"]
-    ]
-  }
+      ["im", "ef"],
+    ],
+  },
 ];
 
 function createEmptySession() {
@@ -103,7 +102,7 @@ function createEmptySession() {
     genre: null,
     mood: null,
     length: null,
-    goal: null
+    goal: null,
   };
 }
 
@@ -122,7 +121,7 @@ function deserializeSession(serialized) {
   }
 
   const shortToKey = Object.fromEntries(
-    sessionSchema.map((entry) => [entry.short, entry.key])
+    sessionSchema.map((entry) => [entry.short, entry.key]),
   );
 
   for (const part of serialized.split(";")) {
@@ -145,8 +144,8 @@ function buildPreferences(session) {
   return Object.fromEntries(
     sessionSchema.map(({ key }) => [
       key,
-      session[key] ? optionCatalog[key][session[key]].value : null
-    ])
+      session[key] ? optionCatalog[key][session[key]].value : null,
+    ]),
   );
 }
 
@@ -161,18 +160,18 @@ function buildStepKeyboard(step, session) {
 
       return {
         text: optionCatalog[step.key][code].label,
-        callback_data: buildCallbackData(nextSession)
+        callback_data: buildCallbackData(nextSession),
       };
-    })
+    }),
   );
 }
 
 function buildStartKeyboard() {
   return [
-    [{ text: "📗 Начать подбор", callback_data: "start_pick" }],
+    [{ text: "📖 Начать подбор", callback_data: "start_pick" }],
     [{ text: "📚 Найти книгу", callback_data: "start_find" }],
     [{ text: "✨ Подборки", callback_data: "start_collections" }],
-    [{ text: "ℹ️ Как это работает", callback_data: "start_help" }]
+    [{ text: "ℹ️ Как это работает", callback_data: "start_help" }],
   ];
 }
 
@@ -187,7 +186,7 @@ async function sendStep(bot, chatId, session) {
 
     await bot.sendMessage(
       chatId,
-      `${message}\n\nЕсли хочешь подобрать заново, нажми /restart.`
+      `${message}\n\nЕсли хочешь подобрать заново, нажми /restart.`,
     );
     return;
   }
@@ -195,8 +194,8 @@ async function sendStep(bot, chatId, session) {
   console.log("Sending next step", { chatId, step: nextStep.key, session });
   await bot.sendMessage(chatId, nextStep.question, {
     reply_markup: {
-      inline_keyboard: buildStepKeyboard(nextStep, session)
-    }
+      inline_keyboard: buildStepKeyboard(nextStep, session),
+    },
   });
 }
 
@@ -210,7 +209,9 @@ function extractCommand(text) {
 }
 
 function extractCommandArgument(text) {
-  return String(text || "").replace(/^\/\S+\s*/, "").trim();
+  return String(text || "")
+    .replace(/^\/\S+\s*/, "")
+    .trim();
 }
 
 async function handleStart(bot, chatId) {
@@ -220,13 +221,13 @@ async function handleStart(bot, chatId) {
     [
       "Привет. Я ReadMoodBot.",
       "Помогаю подобрать книгу под твое состояние: настроение, жанр и то, чего тебе сейчас хочется от чтения.",
-      "Можно ответить на пару вопросов, найти конкретную книгу или посмотреть готовые рекомендации."
+      "Можно ответить на пару вопросов, найти конкретную книгу или посмотреть готовые рекомендации.",
     ].join("\n\n"),
     {
       reply_markup: {
-        inline_keyboard: buildStartKeyboard()
-      }
-    }
+        inline_keyboard: buildStartKeyboard(),
+      },
+    },
   );
 }
 
@@ -243,7 +244,7 @@ async function handleFind(bot, chatId, text) {
   if (!query) {
     await bot.sendMessage(
       chatId,
-      "После команды /find напиши название книги или автора. Например: /find Гарри Поттер"
+      "После команды /find напиши название книги или автора. Например: /find Гарри Поттер",
     );
     return;
   }
@@ -277,8 +278,8 @@ async function handleHelp(bot, chatId) {
       "/start — начать подбор книг",
       "/restart — пройти опрос заново",
       "/find <запрос> — найти книгу по названию или автору",
-      "/help — показать это сообщение"
-    ].join("\n")
+      "/help — показать это сообщение",
+    ].join("\n"),
   );
 }
 
@@ -290,12 +291,11 @@ async function handleMessage(bot, message) {
 
   const chatId = message.chat.id;
   const command = extractCommand(message.text);
-  const isReplyToFindPrompt =
-    message.reply_to_message?.text === findPromptText;
+  const isReplyToFindPrompt = message.reply_to_message?.text === findPromptText;
   console.log("Received message", {
     chatId,
     text: message.text,
-    command
+    command,
   });
 
   if (command === "/start") {
@@ -333,7 +333,7 @@ async function handleCallbackQuery(bot, query) {
   const data = query?.data || "";
   console.log("Received callback query", {
     chatId,
-    data
+    data,
   });
 
   if (!chatId) {
@@ -349,16 +349,12 @@ async function handleCallbackQuery(bot, query) {
 
   if (data === "start_find") {
     await bot.answerCallbackQuery(query.id);
-    await bot.sendMessage(
-      chatId,
-      findPromptText,
-      {
-        reply_markup: {
-          force_reply: true,
-          input_field_placeholder: "Например: Осаму Дадзай"
-        }
-      }
-    );
+    await bot.sendMessage(chatId, findPromptText, {
+      reply_markup: {
+        force_reply: true,
+        input_field_placeholder: "Например: Осаму Дадзай",
+      },
+    });
     return;
   }
 
@@ -372,7 +368,7 @@ async function handleCallbackQuery(bot, query) {
     await bot.answerCallbackQuery(query.id);
     await bot.sendMessage(
       chatId,
-      "Я помогаю подобрать книгу по настроению, жанру и читательскому запросу."
+      "Я помогаю подобрать книгу по настроению, жанру и читательскому запросу.",
     );
     return;
   }
@@ -391,7 +387,7 @@ async function handleCallbackQuery(bot, query) {
 async function handleTelegramUpdate(bot, update) {
   console.log("Handling telegram update", {
     hasMessage: Boolean(update?.message),
-    hasCallbackQuery: Boolean(update?.callback_query)
+    hasCallbackQuery: Boolean(update?.callback_query),
   });
 
   if (update.message) {
@@ -457,5 +453,5 @@ module.exports = {
   createBot,
   getPollingBot,
   getWebhookBot,
-  handleTelegramUpdate
+  handleTelegramUpdate,
 };
