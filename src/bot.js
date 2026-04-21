@@ -320,6 +320,11 @@ async function handleMessage(bot, message) {
 
   if (command === "/help") {
     await handleHelp(bot, chatId);
+    return;
+  }
+
+  if (!command) {
+    await handleFindQuery(bot, chatId, message.text);
   }
 }
 
