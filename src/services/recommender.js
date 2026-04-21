@@ -40,11 +40,11 @@ const vibeToLegacyMoodMap = {
 };
 
 const vibeToVibeMap = {
-  cozy: ["уютная", "теплая", "легкая"],
-  tense: ["напряженная", "мрачная", "тревожная"],
-  light: ["светлая", "легкая", "ободряющая"],
-  melancholic: ["меланхоличная", "хрупкая", "созерцательная"],
-  mysterious: ["таинственная", "атмосферная", "загадочная"]
+  cozy: ["cozy", "warm"],
+  tense: ["tense", "dark"],
+  light: ["light", "uplifting"],
+  melancholic: ["melancholic", "quiet", "reflective"],
+  mysterious: ["mysterious", "dark"]
 };
 
 const genreToLegacyGenreMap = {
