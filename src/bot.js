@@ -5,10 +5,17 @@ const {
   findBooks,
   buildFindBooksMessage,
 } = require("./services/recommender");
+const {
+  collections,
+  findCollectionByCallbackData,
+} = require("./data/collections");
 
 const callbackPrefix = "state:";
 const moreRecommendationsPrefix = "more:";
 const menuCallbackData = "menu";
+const collectionsMenuCallbackData = "collections_menu";
+const backToCollectionsCallbackData = "back_to_collections";
+const backToMenuCallbackData = "back_to_menu";
 const findPromptText =
   "Напиши автора, название книги или используй команду /find";
 const pollingBots = new Map();
@@ -175,7 +182,7 @@ function buildStartKeyboard() {
   return [
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
     [{ text: "📚 Найти книгу", callback_data: "start_find" }],
-    [{ text: "✨ Подборки", callback_data: "start_collections" }],
+    [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
     [{ text: "ℹ️ Как это работает", callback_data: "start_help" }],
   ];
 }
@@ -190,6 +197,67 @@ function buildRecommendationsKeyboard(session) {
     ],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
   ];
+}
+
+function buildCollectionsMenuKeyboard() {
+  return [
+    ...collections.map((collection) => [
+      {
+        text: collection.title,
+        callback_data: collection.callbackData,
+      },
+    ]),
+    [{ text: "🏠 В меню", callback_data: backToMenuCallbackData }],
+  ];
+}
+
+function buildCollectionKeyboard() {
+  return [
+    [{ text: "← К подборкам", callback_data: backToCollectionsCallbackData }],
+    [{ text: "🏠 В меню", callback_data: backToMenuCallbackData }],
+  ];
+}
+
+function buildCollectionMessage(collection) {
+  const blocks = [
+    collection.title,
+    collection.intro,
+    collection.books.map((book) => `• ${book}`).join("\n"),
+  ];
+
+  if (collection.startHere?.length) {
+    blocks.push(
+      [
+        "С чего начать:",
+        collection.startHere.map((item) => `• ${item}`).join("\n"),
+      ].join("\n"),
+    );
+  }
+
+  return blocks.join("\n\n");
+}
+
+async function sendCollectionsMenu(bot, chatId) {
+  await bot.sendMessage(
+    chatId,
+    [
+      "✨ Авторские подборки",
+      "Личные книжные маршруты на разное настроение. Выбери подборку — и я покажу список.",
+    ].join("\n\n"),
+    {
+      reply_markup: {
+        inline_keyboard: buildCollectionsMenuKeyboard(),
+      },
+    },
+  );
+}
+
+async function sendCollection(bot, chatId, collection) {
+  await bot.sendMessage(chatId, buildCollectionMessage(collection), {
+    reply_markup: {
+      inline_keyboard: buildCollectionKeyboard(),
+    },
+  });
 }
 
 async function sendRecommendations(bot, chatId, session) {
@@ -384,9 +452,9 @@ async function handleCallbackQuery(bot, query) {
     return;
   }
 
-  if (data === "start_collections") {
+  if (data === "start_collections" || data === collectionsMenuCallbackData) {
     await bot.answerCallbackQuery(query.id);
-    await bot.sendMessage(chatId, "Подборки скоро появятся.");
+    await sendCollectionsMenu(bot, chatId);
     return;
   }
 
@@ -399,9 +467,23 @@ async function handleCallbackQuery(bot, query) {
     return;
   }
 
-  if (data === menuCallbackData) {
+  if (data === menuCallbackData || data === backToMenuCallbackData) {
     await bot.answerCallbackQuery(query.id);
     await handleStart(bot, chatId);
+    return;
+  }
+
+  if (data === backToCollectionsCallbackData) {
+    await bot.answerCallbackQuery(query.id);
+    await sendCollectionsMenu(bot, chatId);
+    return;
+  }
+
+  const collection = findCollectionByCallbackData(data);
+
+  if (collection) {
+    await bot.answerCallbackQuery(query.id);
+    await sendCollection(bot, chatId, collection);
     return;
   }
 
