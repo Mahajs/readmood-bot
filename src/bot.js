@@ -17,7 +17,7 @@ const collectionsMenuCallbackData = "collections_menu";
 const backToCollectionsCallbackData = "back_to_collections";
 const backToMenuCallbackData = "back_to_menu";
 const findPromptText =
-  "Напиши автора, название книги или используй команду /find";
+  "Напиши автора, название книги или воспользуйся командой /find.";
 const pollingBots = new Map();
 let webhookBot = null;
 
@@ -242,7 +242,8 @@ async function sendCollectionsMenu(bot, chatId) {
     chatId,
     [
       "✨ Авторские подборки",
-      "Личные книжные маршруты на разное настроение. Выбери подборку — и я покажу список.",
+      "Личные книжные маршруты: по теме, жанру или читательскому настроению.",
+      "Выбери подборку — покажу список.",
     ].join("\n\n"),
     {
       reply_markup: {
@@ -314,8 +315,8 @@ async function handleStart(bot, chatId) {
     chatId,
     [
       "Привет. Я ReadMoodBot.",
-      "Помогаю подобрать книгу под твое состояние: настроение, жанр и то, чего тебе сейчас хочется от чтения.",
-      "Можно ответить на пару вопросов, найти конкретную книгу или посмотреть готовые рекомендации.",
+      "Помогаю подобрать книгу под твое состояние: настроение, жанр, атмосферу и темп.",
+      "Можно пройти короткий опрос, найти конкретную книгу или открыть авторские подборки.",
     ].join("\n\n"),
     {
       reply_markup: {
@@ -327,7 +328,7 @@ async function handleStart(bot, chatId) {
 
 async function handleRestart(bot, chatId) {
   console.log("Handling /restart", { chatId });
-  await bot.sendMessage(chatId, "Начинаем заново.");
+  await bot.sendMessage(chatId, "Начнем заново. Поймаем другое читательское настроение.");
   await sendStep(bot, chatId, createEmptySession());
 }
 
@@ -338,7 +339,7 @@ async function handleFind(bot, chatId, text) {
   if (!query) {
     await bot.sendMessage(
       chatId,
-      "После команды /find напиши название книги или автора. Например: /find Гарри Поттер",
+      "После /find напиши автора или название.\n\nНапример: /find Гарри Поттер",
     );
     return;
   }
@@ -368,12 +369,13 @@ async function handleHelp(bot, chatId) {
   await bot.sendMessage(
     chatId,
     [
-      "Команды:",
-      "/start — начать подбор книг",
-      "/restart — пройти опрос заново",
-      "/find <запрос> — найти книгу по названию или автору",
-      "/help — показать это сообщение",
-    ].join("\n"),
+      "Что я умею",
+      "📖 Подобрать книгу — если хочется найти чтение под настроение, атмосферу и темп.",
+      "📚 Найти книгу — если ты ищешь конкретного автора или название.",
+      "✨ Авторские подборки — если хочется выбирать не по настроению, а по теме, жанру или читательскому интересу.",
+      "После рекомендаций можно нажать «Еще варианты» — я покажу другую тройку без нового опроса.",
+      "Если не знаешь, с чего начать, нажми «Что почитать?».",
+    ].join("\n\n"),
   );
 }
 
@@ -462,7 +464,11 @@ async function handleCallbackQuery(bot, query) {
     await bot.answerCallbackQuery(query.id);
     await bot.sendMessage(
       chatId,
-      "Я помогаю подобрать книгу по настроению, жанру и читательскому запросу.",
+      [
+        "Как это работает",
+        "Я могу подобрать книгу через короткий опрос, найти конкретного автора или показать авторские подборки.",
+        "Подбор строится не только по жанру: я смотрю на атмосферу, темп и то, чего тебе сейчас хочется от чтения.",
+      ].join("\n\n"),
     );
     return;
   }

@@ -588,10 +588,7 @@ function buildRecommendationMessage(preferences, recommendationSet) {
     localRecommendations.length > 0 || externalRecommendations.length > 0;
 
   if (!hasRecommendations) {
-    return [
-      "Пока не нашлось точного совпадения по выбранным параметрам.",
-      "Попробуй изменить жанр, настроение или длину книги командой /restart."
-    ].join("\n");
+    return "Пока не получилось найти хороший вариант под эти параметры. Попробуй изменить один из них или начать подбор заново.";
   }
 
   const summary = [
@@ -637,7 +634,7 @@ function buildRecommendationMessage(preferences, recommendationSet) {
 
   if (externalError) {
     blocks.push(
-      "Внешняя база Google Books сейчас временно недоступна, поэтому показаны только локальные рекомендации."
+      "Google Books сейчас не отвечает, поэтому показываю только варианты из моей базы."
     );
   }
 
@@ -649,10 +646,13 @@ function buildFindBooksMessage(query, searchResult) {
   const hasResults = localResults.length > 0 || externalResults.length > 0;
 
   if (!hasResults) {
-    return `По запросу "${query}" ничего не нашлось. Попробуй другое название книги или фамилию автора.`;
+    return [
+      `По запросу "${query}" ничего не нашлось.`,
+      "Попробуй другое название, фамилию автора или более короткий запрос."
+    ].join("\n\n");
   }
 
-  const blocks = [`Вот что я нашел по запросу "${query}":`];
+  const blocks = [`Вот что нашлось по запросу "${query}":`];
 
   if (localResults.length) {
     blocks.push(
@@ -686,7 +686,7 @@ function buildFindBooksMessage(query, searchResult) {
 
   if (externalError) {
     blocks.push(
-      "Google Books сейчас временно недоступна, поэтому показаны только локальные результаты."
+      "Google Books сейчас не отвечает, поэтому показываю только результаты из моей базы."
     );
   }
 
