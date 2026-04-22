@@ -7,6 +7,8 @@ const {
 } = require("./services/recommender");
 
 const callbackPrefix = "state:";
+const moreRecommendationsPrefix = "more:";
+const menuCallbackData = "menu";
 const findPromptText =
   "Напиши автора, название книги или используй команду /find";
 const pollingBots = new Map();
@@ -135,6 +137,10 @@ function buildCallbackData(session) {
   return `${callbackPrefix}${serializeSession(session)}`;
 }
 
+function buildMoreRecommendationsCallbackData(session) {
+  return `${moreRecommendationsPrefix}${serializeSession(session)}`;
+}
+
 function buildPreferences(session) {
   return Object.fromEntries(
     sessionSchema.map(({ key }) => [
@@ -174,19 +180,40 @@ function buildStartKeyboard() {
   ];
 }
 
+function buildRecommendationsKeyboard(session) {
+  return [
+    [
+      {
+        text: "🔁 Еще варианты",
+        callback_data: buildMoreRecommendationsCallbackData(session),
+      },
+    ],
+    [{ text: "🏠 В меню", callback_data: menuCallbackData }],
+  ];
+}
+
+async function sendRecommendations(bot, chatId, session) {
+  const preferences = buildPreferences(session);
+  console.log("Sending final recommendation", { chatId, preferences });
+  const recommendations = await recommendBooks(preferences);
+  const message = buildRecommendationMessage(preferences, recommendations);
+
+  await bot.sendMessage(
+    chatId,
+    `${message}\n\nЕсли хочешь подобрать заново, нажми /restart.`,
+    {
+      reply_markup: {
+        inline_keyboard: buildRecommendationsKeyboard(session),
+      },
+    },
+  );
+}
+
 async function sendStep(bot, chatId, session) {
   const nextStep = getNextStep(session);
 
   if (!nextStep) {
-    const preferences = buildPreferences(session);
-    console.log("Sending final recommendation", { chatId, preferences });
-    const recommendations = await recommendBooks(preferences);
-    const message = buildRecommendationMessage(preferences, recommendations);
-
-    await bot.sendMessage(
-      chatId,
-      `${message}\n\nЕсли хочешь подобрать заново, нажми /restart.`,
-    );
+    await sendRecommendations(bot, chatId, session);
     return;
   }
 
@@ -369,6 +396,22 @@ async function handleCallbackQuery(bot, query) {
       chatId,
       "Я помогаю подобрать книгу по настроению, жанру и читательскому запросу.",
     );
+    return;
+  }
+
+  if (data === menuCallbackData) {
+    await bot.answerCallbackQuery(query.id);
+    await handleStart(bot, chatId);
+    return;
+  }
+
+  if (data.startsWith(moreRecommendationsPrefix)) {
+    const session = deserializeSession(
+      data.slice(moreRecommendationsPrefix.length),
+    );
+    console.log("Decoded more recommendations session", { chatId, session });
+    await bot.answerCallbackQuery(query.id);
+    await sendRecommendations(bot, chatId, session);
     return;
   }
 
