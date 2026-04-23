@@ -134,7 +134,7 @@ const structuredGenreProfiles = {
   detective: {
     exactTitles: ["Жертва подозреваемого X"],
     exactAuthors: [],
-    exactThemes: [],
+    exactThemes: ["детектив"],
     adjacentTitles: [],
     adjacentThemes: [],
     adjacentVibes: [],
