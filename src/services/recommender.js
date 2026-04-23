@@ -128,6 +128,81 @@ const randomRecommendationPlan = {
 };
 
 const randomTopLimit = 6;
+const defaultTopLimit = 4;
+
+const structuredGenreProfiles = {
+  detective: {
+    exactTitles: ["Жертва подозреваемого X"],
+    exactAuthors: [],
+    exactThemes: [],
+    adjacentTitles: [],
+    adjacentThemes: [],
+    adjacentVibes: [],
+    stretchTitles: [],
+    stretchThemes: [],
+    stretchVibes: []
+  },
+  classic: {
+    exactTitles: [
+      "1984",
+      "Скотный двор",
+      "451 градус по Фаренгейту",
+      "Три товарища",
+      "Над пропастью во ржи",
+      "Исповедь неполноценного человека",
+      "Закатное солнце",
+      "Кокоро",
+      "Ваш покорный слуга кот",
+      "Рассёмон",
+      "В чаще",
+      "Тысячекрылый журавль",
+      "Стон горы",
+      "Женщина в песках",
+      "Золотой храм",
+      "Жажда любви"
+    ],
+    exactAuthors: [
+      "Джордж Оруэлл",
+      "Рэй Брэдбери",
+      "Эрих Мария Ремарк",
+      "Джером Д. Сэлинджер",
+      "Осаму Дадзай",
+      "Кобо Абэ",
+      "Юкио Мисима",
+      "Нацумэ Сосэки",
+      "Рюноскэ Акутагава",
+      "Ясунари Кавабата"
+    ],
+    adjacentTitles: ["Цветы для Элджернона", "Дюна"],
+    adjacentThemes: ["свобода", "общество", "одиночество"]
+  },
+  contemporary: {
+    exactTitles: [
+      "Полночная библиотека",
+      "Вторая жизнь Уве",
+      "Маленькая жизнь",
+      "Кухня",
+      "Цугуми",
+      "Человек-комбини",
+      "Земляноиды",
+      "Чудеса универсама «Намиа»",
+      "Кафка на пляже",
+      "Норвежский лес",
+      "1Q84"
+    ],
+    exactAuthors: [
+      "Мэтт Хейг",
+      "Фредрик Бакман",
+      "Ханья Янагихара",
+      "Харуки Мураками",
+      "Банана Ёсимото",
+      "Саяка Мурата",
+      "Кэйго Хигасино"
+    ],
+    adjacentTitles: ["Марсианин", "Проект «Аве Мария»"],
+    adjacentThemes: ["идентичность", "выбор", "одиночество"]
+  }
+};
 
 function intersects(values, candidates) {
   if (!Array.isArray(values) || !Array.isArray(candidates)) {
@@ -149,15 +224,104 @@ function matchesAny(value, candidates) {
   return value && Array.isArray(candidates) && candidates.includes(value);
 }
 
+function matchesBookIdentity(book, candidates = []) {
+  return (
+    candidates.includes(book.title) ||
+    candidates.includes(book.author) ||
+    candidates.includes(`${book.title} — ${book.author}`)
+  );
+}
+
+function getGenreMatchLevel(book, requestedGenre) {
+  if (!requestedGenre || requestedGenre === "any") {
+    return 0;
+  }
+
+  if (requestedGenre === "non-fiction") {
+    return book.format === "нон-фикшн" ? 2 : -1;
+  }
+
+  if (requestedGenre === "fantasy") {
+    return book.genre === "фэнтези" ? 2 : -1;
+  }
+
+  if (requestedGenre === "sci-fi") {
+    return book.genre === "фантастика" ? 2 : -1;
+  }
+
+  const profile = structuredGenreProfiles[requestedGenre];
+
+  if (profile) {
+    if (
+      matchesBookIdentity(book, profile.exactTitles || []) ||
+      matchesBookIdentity(book, profile.exactAuthors || []) ||
+      intersects(book.themes, profile.exactThemes || [])
+    ) {
+      return 2;
+    }
+
+    if (
+      matchesBookIdentity(book, profile.adjacentTitles || []) ||
+      intersects(book.themes, profile.adjacentThemes || []) ||
+      intersects(book.vibe, profile.adjacentVibes || [])
+    ) {
+      return 1;
+    }
+
+    return -1;
+  }
+
+  if (requestedGenre === "novel") {
+    return book.genre === "художественная литература" ? 2 : -1;
+  }
+
+  return matchesAny(book.genre, genreToLegacyGenreMap[requestedGenre]) ? 2 : -1;
+}
+
+function isStrongGenreMatch(book, preferences) {
+  return getGenreMatchLevel(book, preferences.genre) >= 2;
+}
+
+function isGenreCompatible(book, preferences) {
+  return getGenreMatchLevel(book, preferences.genre) >= 1;
+}
+
+function isStretchGenreCompatible(book, preferences) {
+  const requestedGenre = preferences.genre;
+
+  if (!requestedGenre || requestedGenre === "any") {
+    return true;
+  }
+
+  if (isGenreCompatible(book, preferences)) {
+    return true;
+  }
+
+  const profile = structuredGenreProfiles[requestedGenre];
+
+  if (!profile) {
+    return false;
+  }
+
+  return (
+    matchesBookIdentity(book, profile.stretchTitles || []) ||
+    intersects(book.themes, profile.stretchThemes || []) ||
+    intersects(book.vibe, profile.stretchVibes || [])
+  );
+}
+
 function scoreBook(book, preferences) {
   let score = 0;
+  const genreMatchLevel = getGenreMatchLevel(book, preferences.genre);
 
-  if (
-    preferences.genre &&
-    preferences.genre !== "any" &&
-    matchesAny(book.genre, genreToLegacyGenreMap[preferences.genre])
-  ) {
-    score += 4;
+  if (preferences.genre && preferences.genre !== "any") {
+    if (genreMatchLevel >= 2) {
+      score += 9;
+    } else if (genreMatchLevel === 1) {
+      score += 4;
+    } else {
+      score -= 4;
+    }
   }
 
   if (
@@ -302,7 +466,7 @@ function sortSafeCandidates(candidates, preferences) {
   );
 }
 
-function hasDifferentTasteVector(book, exactBook) {
+function hasDifferentTasteVector(book, exactBook, preferences) {
   if (!exactBook) {
     return true;
   }
@@ -311,6 +475,10 @@ function hasDifferentTasteVector(book, exactBook) {
   const exactVibe = Array.isArray(exactBook.vibe) ? exactBook.vibe : [];
   const bookVibe = Array.isArray(book.vibe) ? book.vibe : [];
   const differentVibe = !bookVibe.some((vibe) => exactVibe.includes(vibe));
+
+  if (preferences.genre && preferences.genre !== "any") {
+    return differentVibe || getGenreMatchLevel(book, preferences.genre) === 1;
+  }
 
   return differentGenre || differentVibe;
 }
@@ -335,6 +503,32 @@ function pickRandomFromTop(candidates, usedIds, topLimit = randomTopLimit) {
 
   const randomIndex = Math.floor(Math.random() * topCandidates.length);
   return topCandidates[randomIndex];
+}
+
+function pickRankedUnique(candidates, usedIds, topLimit = defaultTopLimit) {
+  return pickRandomFromTop(candidates, usedIds, topLimit);
+}
+
+function expandCandidatePool(primaryCandidates, secondaryCandidates, minSize = 3) {
+  const expanded = [...primaryCandidates];
+  const existingIds = new Set(
+    expanded.map((book) => createBookIdentity(book.title, book.author))
+  );
+
+  for (const candidate of secondaryCandidates) {
+    const id = createBookIdentity(candidate.title, candidate.author);
+
+    if (!existingIds.has(id)) {
+      expanded.push(candidate);
+      existingIds.add(id);
+    }
+
+    if (expanded.length >= minSize) {
+      break;
+    }
+  }
+
+  return expanded;
 }
 
 function findBookByTitle(title) {
@@ -387,44 +581,96 @@ function buildRoleRecommendations(preferences) {
     .filter((book) => book.score > 0)
     .sort((a, b) => b.score - a.score);
   const usedIds = new Set();
-  const exact = scoredBooks[0] || null;
+  const strongGenreCandidates =
+    preferences.genre && preferences.genre !== "any"
+      ? scoredBooks.filter((book) => isStrongGenreMatch(book, preferences))
+      : scoredBooks;
+  const compatibleGenreCandidates =
+    preferences.genre && preferences.genre !== "any"
+      ? scoredBooks.filter((book) => isGenreCompatible(book, preferences))
+      : scoredBooks;
+  const exactCandidates =
+    preferences.genre && preferences.genre !== "any"
+      ? (strongGenreCandidates.length ? strongGenreCandidates : compatibleGenreCandidates)
+      : scoredBooks;
+  const exact = pickRankedUnique(
+    exactCandidates.length ? exactCandidates : scoredBooks,
+    usedIds,
+    3
+  );
 
   if (exact) {
     usedIds.add(createBookIdentity(exact.title, exact.author));
   }
 
+  const genreSafeCandidates =
+    preferences.genre && preferences.genre !== "any"
+      ? expandCandidatePool(strongGenreCandidates, compatibleGenreCandidates, 4)
+      : scoredBooks;
   const safe =
-    pickFirstUnique(
+    pickRankedUnique(
       sortSafeCandidates(
-        scoredBooks.filter(
+        genreSafeCandidates.filter(
           (book) => book.score >= 3 && isSafeBook(book, preferences)
         ),
         preferences
       ),
       usedIds
+      ,
+      4
     ) ||
-    pickFirstUnique(
+    pickRankedUnique(
       sortSafeCandidates(
-        scoredBooks.filter((book) => isSafeBook(book, preferences)),
+        genreSafeCandidates.filter((book) => isSafeBook(book, preferences)),
         preferences
       ),
-      usedIds
+      usedIds,
+      4
+    ) ||
+    pickRankedUnique(
+      sortSafeCandidates(
+        scoredBooks.filter(
+          (book) =>
+            isSafeBook(book, preferences) && isGenreCompatible(book, preferences)
+        ),
+        preferences
+      ),
+      usedIds,
+      4
     );
 
   if (safe) {
     usedIds.add(createBookIdentity(safe.title, safe.author));
   }
 
+  const stretchCandidates = scoredBooks.filter(
+    (book) =>
+      book.score >= 2 &&
+      !isHighComplexity(book) &&
+      hasDifferentTasteVector(book, exact, preferences) &&
+      (
+        !preferences.genre ||
+        preferences.genre === "any" ||
+        isStretchGenreCompatible(book, preferences)
+      )
+  );
   const stretch =
-    pickFirstUnique(
+    pickRankedUnique(stretchCandidates, usedIds, 5) ||
+    pickRankedUnique(
       scoredBooks.filter(
         (book) =>
-          book.score >= 2 &&
-          !isHighComplexity(book) &&
-          hasDifferentTasteVector(book, exact)
+          !preferences.genre ||
+          preferences.genre === "any" ||
+          isStretchGenreCompatible(book, preferences)
       ),
-      usedIds
-    ) || pickFirstUnique(scoredBooks, usedIds);
+      usedIds,
+      5
+    ) ||
+    (
+      preferences.genre && preferences.genre !== "any"
+        ? null
+        : pickRankedUnique(scoredBooks, usedIds, 5)
+    );
 
   return {
     exact,
@@ -557,24 +803,24 @@ function buildRecommendationMessage(preferences, recommendationSet) {
 
     if (exact) {
       blocks.push([
-        "Самое точное попадание",
-        `${exact.title} — ${exact.author}`,
+        "📘 Самое точное попадание",
+        `«${exact.title}» — ${exact.author}`,
         exact.recommendationText || exact.description
       ]);
     }
 
     if (safe) {
       blocks.push([
-        "Более легкий вариант",
-        `${safe.title} — ${safe.author}`,
+        "🌿 Более легкий вариант",
+        `«${safe.title}» — ${safe.author}`,
         safe.recommendationText || safe.description
       ]);
     }
 
     if (stretch) {
       blocks.push([
-        "Вариант чуть в сторону",
-        `${stretch.title} — ${stretch.author}`,
+        "✨ Вариант чуть в сторону",
+        `«${stretch.title}» — ${stretch.author}`,
         stretch.recommendationText || stretch.description
       ]);
     }

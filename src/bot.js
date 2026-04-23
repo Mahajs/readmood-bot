@@ -199,6 +199,23 @@ function buildRecommendationsKeyboard(session) {
   ];
 }
 
+function buildHelpKeyboard() {
+  return [
+    [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
+    [{ text: "📚 Найти книгу", callback_data: "start_find" }],
+    [{ text: "✨ Авторские подборки", callback_data: collectionsMenuCallbackData }],
+    [{ text: "🏠 В меню", callback_data: menuCallbackData }],
+  ];
+}
+
+function buildSearchResultKeyboard() {
+  return [
+    [{ text: "📖 Подобрать книгу", callback_data: "start_pick" }],
+    [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
+    [{ text: "🏠 В меню", callback_data: menuCallbackData }],
+  ];
+}
+
 function buildCollectionsMenuKeyboard() {
   return [
     ...collections.map((collection) => [
@@ -340,6 +357,11 @@ async function handleFind(bot, chatId, text) {
     await bot.sendMessage(
       chatId,
       "После /find напиши автора или название.\n\nНапример: /find Гарри Поттер",
+      {
+        reply_markup: {
+          inline_keyboard: buildSearchResultKeyboard(),
+        },
+      },
     );
     return;
   }
@@ -347,21 +369,33 @@ async function handleFind(bot, chatId, text) {
   await bot.sendMessage(chatId, `Ищу книги по запросу: ${query}`);
   const searchResult = await findBooks(query);
   const message = buildFindBooksMessage(query, searchResult);
-  await bot.sendMessage(chatId, message);
+  await bot.sendMessage(chatId, message, {
+    reply_markup: {
+      inline_keyboard: buildSearchResultKeyboard(),
+    },
+  });
 }
 
 async function handleFindQuery(bot, chatId, query) {
   const trimmedQuery = String(query || "").trim();
 
   if (!trimmedQuery) {
-    await bot.sendMessage(chatId, findPromptText);
+    await bot.sendMessage(chatId, findPromptText, {
+      reply_markup: {
+        inline_keyboard: buildSearchResultKeyboard(),
+      },
+    });
     return;
   }
 
   await bot.sendMessage(chatId, `Ищу книги по запросу: ${trimmedQuery}`);
   const searchResult = await findBooks(trimmedQuery);
   const message = buildFindBooksMessage(trimmedQuery, searchResult);
-  await bot.sendMessage(chatId, message);
+  await bot.sendMessage(chatId, message, {
+    reply_markup: {
+      inline_keyboard: buildSearchResultKeyboard(),
+    },
+  });
 }
 
 async function handleHelp(bot, chatId) {
@@ -376,6 +410,11 @@ async function handleHelp(bot, chatId) {
       "После рекомендаций можно нажать «Еще варианты» — я покажу другую тройку без нового опроса.",
       "Если не знаешь, с чего начать, нажми «Что почитать?».",
     ].join("\n\n"),
+    {
+      reply_markup: {
+        inline_keyboard: buildHelpKeyboard(),
+      },
+    },
   );
 }
 
@@ -469,6 +508,11 @@ async function handleCallbackQuery(bot, query) {
         "Я могу подобрать книгу через короткий опрос, найти конкретного автора или показать авторские подборки.",
         "Подбор строится не только по жанру: я смотрю на атмосферу, темп и то, чего тебе сейчас хочется от чтения.",
       ].join("\n\n"),
+      {
+        reply_markup: {
+          inline_keyboard: buildHelpKeyboard(),
+        },
+      },
     );
     return;
   }
