@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
+    "validate-books": "node scripts/validate-books.js",
     "set-webhook": "node scripts/set-webhook.js",
     "delete-webhook": "node scripts/delete-webhook.js"
   },

@@ -23,13 +23,13 @@ let webhookBot = null;
 
 const optionCatalog = {
   goal: {
-    rl: { label: "Отдохнуть и отвлечься", value: "relax" },
+    rl: { label: "Отдохнуть", value: "relax" },
     in: { label: "Вдохновиться", value: "inspire" },
     em: { label: "Попереживать", value: "emotional" },
     rf: { label: "Подумать о жизни", value: "reflective" },
-    es: { label: "Погрузиться в другой мир", value: "escape" },
+    es: { label: "Полное погружение", value: "escape" },
     dy: { label: "Хочется динамики", value: "dynamic" },
-    ra: { label: "Не знаю, просто посоветуй что-нибудь", value: "random" },
+    ra: { label: "🎲 Удиви меня", value: "random" },
   },
   vibe: {
     cz: { label: "Уютная", value: "cozy" },
@@ -47,19 +47,19 @@ const optionCatalog = {
     nf: { label: "Нон-фикшн", value: "non-fiction" },
     co: { label: "Современная проза", value: "contemporary" },
     cl: { label: "Классика", value: "classic" },
-    an: { label: "Не принципиально", value: "any" },
+    an: { label: "Не важно", value: "any" },
   },
   pace: {
     sl: { label: "Медленный", value: "slow" },
     md: { label: "Средний", value: "medium" },
     fs: { label: "Динамичный", value: "fast" },
-    vf: { label: "Очень динамичный", value: "very_fast" },
+    vf: { label: "Стремительный", value: "very_fast" },
     an: { label: "Не важно", value: "any" },
   },
   length: {
     sh: { label: "Короткая книга", value: "short" },
     md: { label: "Средняя по объему", value: "medium" },
-    lg: { label: "Большая, чтобы надолго", value: "long" },
+    lg: { label: "Надолго", value: "long" },
     an: { label: "Не важно", value: "any" },
   },
 };
@@ -195,6 +195,20 @@ function buildRecommendationsKeyboard(session) {
         callback_data: buildMoreRecommendationsCallbackData(session),
       },
     ],
+    [{ text: "🔄 Подобрать заново", callback_data: "start_pick" }],
+    [{ text: "🏠 В меню", callback_data: menuCallbackData }],
+  ];
+}
+
+function buildRandomRecommendationKeyboard(session) {
+  return [
+    [
+      {
+        text: "🎲 Еще случайная книга",
+        callback_data: buildMoreRecommendationsCallbackData(session),
+      },
+    ],
+    [{ text: "🔄 Подобрать заново", callback_data: "start_pick" }],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
   ];
 }
@@ -203,14 +217,14 @@ function buildHelpKeyboard() {
   return [
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
     [{ text: "📚 Найти книгу", callback_data: "start_find" }],
-    [{ text: "✨ Авторские подборки", callback_data: collectionsMenuCallbackData }],
+    [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
   ];
 }
 
 function buildSearchResultKeyboard() {
   return [
-    [{ text: "📖 Подобрать книгу", callback_data: "start_pick" }],
+    [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
     [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
   ];
@@ -220,7 +234,7 @@ function buildCollectionsMenuKeyboard() {
   return [
     ...collections.map((collection) => [
       {
-        text: collection.title,
+        text: collection.buttonLabel || collection.title,
         callback_data: collection.callbackData,
       },
     ]),
@@ -282,14 +296,33 @@ async function sendRecommendations(bot, chatId, session) {
   const preferences = buildPreferences(session);
   console.log("Sending final recommendation", { chatId, preferences });
   const recommendations = await recommendBooks(preferences);
-  const message = buildRecommendationMessage(preferences, recommendations);
+  const isRandom = preferences.goal === "random";
+  let message = buildRecommendationMessage(preferences, recommendations);
+  let keyboard = buildRecommendationsKeyboard(session);
+
+  if (isRandom) {
+    const randomBook =
+      recommendations.roleRecommendations?.exact ||
+      recommendations.localRecommendations?.[0] ||
+      recommendations.externalRecommendations?.[0];
+
+    if (randomBook) {
+      message = [
+        "🎲 Сегодня я бы предложил тебе:",
+        `«${randomBook.title}» — ${randomBook.author}`,
+        randomBook.recommendationText || randomBook.description,
+      ].join("\n\n");
+    }
+
+    keyboard = buildRandomRecommendationKeyboard(session);
+  }
 
   await bot.sendMessage(
     chatId,
-    `${message}\n\nЕсли хочешь подобрать заново, нажми /restart.`,
+    message,
     {
       reply_markup: {
-        inline_keyboard: buildRecommendationsKeyboard(session),
+        inline_keyboard: keyboard,
       },
     },
   );
