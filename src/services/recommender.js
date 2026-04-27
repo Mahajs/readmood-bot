@@ -868,6 +868,16 @@ async function recommendBooks(preferences, options = {}) {
     };
   }
 
+  if (chainPage > 0) {
+    return {
+      roleRecommendations: null,
+      localRecommendations: [],
+      externalRecommendations: [],
+      externalError: null,
+      exhausted: true
+    };
+  }
+
   const localLimit = options.localLimit || 3;
   const externalLimit = options.externalLimit || 3;
   const localRecommendations = recommendLocalBooks(preferences, localLimit);
@@ -928,6 +938,10 @@ async function findBooks(query, options = {}) {
 }
 
 function buildRecommendationMessage(preferences, recommendationSet) {
+  if (recommendationSet.exhausted) {
+    return "Похоже, я уже показал все подходящие варианты по этому запросу. Можно подобрать заново или вернуться в меню.";
+  }
+
   if (recommendationSet.roleRecommendations) {
     const { exact, safe, stretch } = recommendationSet.roleRecommendations;
     const blocks = [["Вот что я бы предложил:"]];

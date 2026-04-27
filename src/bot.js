@@ -293,6 +293,13 @@ function buildRandomRecommendationKeyboard(session, recommendationState) {
   ];
 }
 
+function buildExhaustedRecommendationsKeyboard() {
+  return [
+    [{ text: "🔄 Подобрать заново", callback_data: "start_pick" }],
+    [{ text: "🏠 В меню", callback_data: menuCallbackData }],
+  ];
+}
+
 function buildHelpKeyboard() {
   return [
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
@@ -395,7 +402,9 @@ async function sendRecommendations(bot, chatId, session, currentRecommendationSt
   };
   let keyboard = buildRecommendationsKeyboard(session, nextRecommendationState);
 
-  if (isRandom) {
+  if (recommendations.exhausted) {
+    keyboard = buildExhaustedRecommendationsKeyboard();
+  } else if (isRandom) {
     const randomBook =
       recommendations.roleRecommendations?.exact ||
       recommendations.localRecommendations?.[0] ||
