@@ -20,6 +20,8 @@ const findPromptText =
   "Напиши автора, название книги или воспользуйся командой /find.";
 const pollingBots = new Map();
 let webhookBot = null;
+const recommendationSeedKey = "s";
+const recommendationPageKey = "n";
 
 const optionCatalog = {
   goal: {
@@ -144,8 +146,80 @@ function buildCallbackData(session) {
   return `${callbackPrefix}${serializeSession(session)}`;
 }
 
-function buildMoreRecommendationsCallbackData(session) {
-  return `${moreRecommendationsPrefix}${serializeSession(session)}`;
+function createRecommendationSeed() {
+  return Math.floor(Math.random() * 46656);
+}
+
+function serializeRecommendationState(session, recommendationState = {}) {
+  const parts = [];
+  const sessionState = serializeSession(session);
+
+  if (sessionState) {
+    parts.push(sessionState);
+  }
+
+  if (Number.isFinite(recommendationState.seed)) {
+    parts.push(
+      `${recommendationSeedKey}=${recommendationState.seed.toString(36)}`
+    );
+  }
+
+  if (Number.isFinite(recommendationState.page)) {
+    parts.push(
+      `${recommendationPageKey}=${recommendationState.page.toString(36)}`
+    );
+  }
+
+  return parts.join(";");
+}
+
+function deserializeRecommendationState(serialized) {
+  const parsedState = {
+    session: createEmptySession(),
+    recommendationState: {
+      seed: null,
+      page: 0,
+    },
+  };
+
+  if (!serialized) {
+    return parsedState;
+  }
+
+  parsedState.session = deserializeSession(serialized);
+
+  for (const part of serialized.split(";")) {
+    const [key, value] = part.split("=");
+
+    if (!value) {
+      continue;
+    }
+
+    if (key === recommendationSeedKey) {
+      const seed = Number.parseInt(value, 36);
+
+      if (Number.isFinite(seed)) {
+        parsedState.recommendationState.seed = seed;
+      }
+    }
+
+    if (key === recommendationPageKey) {
+      const page = Number.parseInt(value, 36);
+
+      if (Number.isFinite(page) && page >= 0) {
+        parsedState.recommendationState.page = page;
+      }
+    }
+  }
+
+  return parsedState;
+}
+
+function buildMoreRecommendationsCallbackData(session, recommendationState) {
+  return `${moreRecommendationsPrefix}${serializeRecommendationState(
+    session,
+    recommendationState,
+  )}`;
 }
 
 function buildPreferences(session) {
@@ -187,12 +261,15 @@ function buildStartKeyboard() {
   ];
 }
 
-function buildRecommendationsKeyboard(session) {
+function buildRecommendationsKeyboard(session, recommendationState) {
   return [
     [
       {
         text: "🔁 Еще варианты",
-        callback_data: buildMoreRecommendationsCallbackData(session),
+        callback_data: buildMoreRecommendationsCallbackData(
+          session,
+          recommendationState,
+        ),
       },
     ],
     [{ text: "🔄 Подобрать заново", callback_data: "start_pick" }],
@@ -200,12 +277,15 @@ function buildRecommendationsKeyboard(session) {
   ];
 }
 
-function buildRandomRecommendationKeyboard(session) {
+function buildRandomRecommendationKeyboard(session, recommendationState) {
   return [
     [
       {
         text: "🎲 Еще случайная книга",
-        callback_data: buildMoreRecommendationsCallbackData(session),
+        callback_data: buildMoreRecommendationsCallbackData(
+          session,
+          recommendationState,
+        ),
       },
     ],
     [{ text: "🔄 Подобрать заново", callback_data: "start_pick" }],
@@ -292,13 +372,28 @@ async function sendCollection(bot, chatId, collection) {
   });
 }
 
-async function sendRecommendations(bot, chatId, session) {
+async function sendRecommendations(bot, chatId, session, currentRecommendationState = {}) {
   const preferences = buildPreferences(session);
+  const recommendationState = {
+    seed: Number.isFinite(currentRecommendationState.seed)
+      ? currentRecommendationState.seed
+      : createRecommendationSeed(),
+    page: Number.isFinite(currentRecommendationState.page)
+      ? currentRecommendationState.page
+      : 0,
+  };
   console.log("Sending final recommendation", { chatId, preferences });
-  const recommendations = await recommendBooks(preferences);
+  const recommendations = await recommendBooks(preferences, {
+    chainSeed: recommendationState.seed,
+    chainPage: recommendationState.page,
+  });
   const isRandom = preferences.goal === "random";
   let message = buildRecommendationMessage(preferences, recommendations);
-  let keyboard = buildRecommendationsKeyboard(session);
+  const nextRecommendationState = {
+    seed: recommendationState.seed,
+    page: recommendationState.page + 1,
+  };
+  let keyboard = buildRecommendationsKeyboard(session, nextRecommendationState);
 
   if (isRandom) {
     const randomBook =
@@ -314,7 +409,10 @@ async function sendRecommendations(bot, chatId, session) {
       ].join("\n\n");
     }
 
-    keyboard = buildRandomRecommendationKeyboard(session);
+    keyboard = buildRandomRecommendationKeyboard(
+      session,
+      nextRecommendationState,
+    );
   }
 
   await bot.sendMessage(
@@ -571,12 +669,16 @@ async function handleCallbackQuery(bot, query) {
   }
 
   if (data.startsWith(moreRecommendationsPrefix)) {
-    const session = deserializeSession(
+    const { session, recommendationState } = deserializeRecommendationState(
       data.slice(moreRecommendationsPrefix.length),
     );
-    console.log("Decoded more recommendations session", { chatId, session });
+    console.log("Decoded more recommendations session", {
+      chatId,
+      session,
+      recommendationState,
+    });
     await bot.answerCallbackQuery(query.id);
-    await sendRecommendations(bot, chatId, session);
+    await sendRecommendations(bot, chatId, session, recommendationState);
     return;
   }
 

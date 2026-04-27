@@ -129,6 +129,14 @@ const randomRecommendationPlan = {
 
 const randomTopLimit = 6;
 const defaultTopLimit = 4;
+const recommendationRoles = ["exact", "safe", "stretch"];
+const randomRotationTitles = Array.from(
+  new Set([
+    ...randomRecommendationPlan.exact,
+    ...randomRecommendationPlan.safe,
+    ...randomRecommendationPlan.stretch
+  ])
+);
 
 const structuredGenreProfiles = {
   detective: {
@@ -509,6 +517,37 @@ function pickRankedUnique(candidates, usedIds, topLimit = defaultTopLimit) {
   return pickRandomFromTop(candidates, usedIds, topLimit);
 }
 
+function createSelectionIndex(seed, page, salt, length) {
+  if (!length) {
+    return 0;
+  }
+
+  const normalizedSeed = Number.isFinite(seed) ? seed : 0;
+  const normalizedPage = Number.isFinite(page) ? page : 0;
+  return Math.abs(normalizedSeed + normalizedPage * 7 + salt * 13) % length;
+}
+
+function pickSeededUnique(
+  candidates,
+  usedIds,
+  topLimit,
+  seed,
+  page,
+  salt
+) {
+  const availableCandidates = candidates.filter((book) => {
+    const id = createBookIdentity(book.title, book.author);
+    return !usedIds.has(id);
+  });
+  const topCandidates = availableCandidates.slice(0, topLimit);
+
+  if (!topCandidates.length) {
+    return null;
+  }
+
+  return topCandidates[createSelectionIndex(seed, page, salt, topCandidates.length)];
+}
+
 function expandCandidatePool(primaryCandidates, secondaryCandidates, minSize = 3) {
   const expanded = [...primaryCandidates];
   const existingIds = new Set(
@@ -535,7 +574,7 @@ function findBookByTitle(title) {
   return books.find((book) => book.title === title);
 }
 
-function pickRandomRecommendations() {
+function pickRandomRecommendations(seed = 0, page = 0) {
   const usedIds = new Set();
   const randomPreferences = { goal: "random", vibe: "any" };
   const exactCandidates = randomRecommendationPlan.exact
@@ -547,19 +586,26 @@ function pickRandomRecommendations() {
   const stretchCandidates = randomRecommendationPlan.stretch
     .map(findBookByTitle)
     .filter((book) => book && !isHighComplexity(book));
-  const exact = pickRandomFromTop(exactCandidates, usedIds);
+  const exact = pickSeededUnique(exactCandidates, usedIds, randomTopLimit, seed, page, 1);
 
   if (exact) {
     usedIds.add(createBookIdentity(exact.title, exact.author));
   }
 
-  const safe = pickRandomFromTop(safeCandidates, usedIds);
+  const safe = pickSeededUnique(safeCandidates, usedIds, randomTopLimit, seed, page, 2);
 
   if (safe) {
     usedIds.add(createBookIdentity(safe.title, safe.author));
   }
 
-  const stretch = pickRandomFromTop(stretchCandidates, usedIds);
+  const stretch = pickSeededUnique(
+    stretchCandidates,
+    usedIds,
+    randomTopLimit,
+    seed,
+    page,
+    3
+  );
 
   return {
     exact,
@@ -568,9 +614,34 @@ function pickRandomRecommendations() {
   };
 }
 
-function buildRoleRecommendations(preferences) {
+function buildRandomChainRecommendation(seed = 0, page = 0) {
+  const pool = randomRotationTitles
+    .map(findBookByTitle)
+    .filter(Boolean);
+
+  if (!pool.length) {
+    return null;
+  }
+
+  const orderedPool = [...pool].sort((a, b) =>
+    createBookIdentity(a.title, a.author).localeCompare(
+      createBookIdentity(b.title, b.author)
+    )
+  );
+  const rotationOffset = createSelectionIndex(seed, 0, 11, orderedPool.length);
+  const rotatedPool = orderedPool
+    .slice(rotationOffset)
+    .concat(orderedPool.slice(0, rotationOffset));
+
+  return rotatedPool[page % rotatedPool.length];
+}
+
+function buildRoleRecommendations(preferences, options = {}) {
+  const chainSeed = Number.isFinite(options.chainSeed) ? options.chainSeed : 0;
+  const chainPage = Number.isFinite(options.chainPage) ? options.chainPage : 0;
+
   if (preferences.goal === "random") {
-    return pickRandomRecommendations();
+    return pickRandomRecommendations(chainSeed, chainPage);
   }
 
   const scoredBooks = books
@@ -580,7 +651,6 @@ function buildRoleRecommendations(preferences) {
     }))
     .filter((book) => book.score > 0)
     .sort((a, b) => b.score - a.score);
-  const usedIds = new Set();
   const strongGenreCandidates =
     preferences.genre && preferences.genre !== "any"
       ? scoredBooks.filter((book) => isStrongGenreMatch(book, preferences))
@@ -593,90 +663,134 @@ function buildRoleRecommendations(preferences) {
     preferences.genre && preferences.genre !== "any"
       ? (strongGenreCandidates.length ? strongGenreCandidates : compatibleGenreCandidates)
       : scoredBooks;
-  const exact = pickRankedUnique(
-    exactCandidates.length ? exactCandidates : scoredBooks,
-    usedIds,
-    3
-  );
-
-  if (exact) {
-    usedIds.add(createBookIdentity(exact.title, exact.author));
-  }
-
   const genreSafeCandidates =
     preferences.genre && preferences.genre !== "any"
       ? expandCandidatePool(strongGenreCandidates, compatibleGenreCandidates, 4)
       : scoredBooks;
-  const safe =
-    pickRankedUnique(
-      sortSafeCandidates(
-        genreSafeCandidates.filter(
-          (book) => book.score >= 3 && isSafeBook(book, preferences)
-        ),
-        preferences
-      ),
-      usedIds
-      ,
-      4
-    ) ||
-    pickRankedUnique(
-      sortSafeCandidates(
-        genreSafeCandidates.filter((book) => isSafeBook(book, preferences)),
-        preferences
-      ),
-      usedIds,
-      4
-    ) ||
-    pickRankedUnique(
-      sortSafeCandidates(
-        scoredBooks.filter(
-          (book) =>
-            isSafeBook(book, preferences) && isGenreCompatible(book, preferences)
-        ),
-        preferences
-      ),
-      usedIds,
-      4
-    );
-
-  if (safe) {
-    usedIds.add(createBookIdentity(safe.title, safe.author));
-  }
-
   const stretchCandidates = scoredBooks.filter(
     (book) =>
       book.score >= 2 &&
       !isHighComplexity(book) &&
-      hasDifferentTasteVector(book, exact, preferences) &&
       (
         !preferences.genre ||
         preferences.genre === "any" ||
         isStretchGenreCompatible(book, preferences)
       )
   );
-  const stretch =
-    pickRankedUnique(stretchCandidates, usedIds, 5) ||
-    pickRankedUnique(
-      scoredBooks.filter(
-        (book) =>
-          !preferences.genre ||
-          preferences.genre === "any" ||
-          isStretchGenreCompatible(book, preferences)
-      ),
-      usedIds,
-      5
-    ) ||
-    (
-      preferences.genre && preferences.genre !== "any"
-        ? null
-        : pickRankedUnique(scoredBooks, usedIds, 5)
-    );
+  let currentPageRecommendations = {};
+  const usedIds = new Set();
 
-  return {
-    exact,
-    safe,
-    stretch
-  };
+  for (let page = 0; page <= chainPage; page += 1) {
+    const pageUsedIds = new Set(usedIds);
+    const exact =
+      pickSeededUnique(
+        exactCandidates.length ? exactCandidates : scoredBooks,
+        pageUsedIds,
+        3,
+        chainSeed,
+        page,
+        1
+      ) || null;
+
+    if (exact) {
+      pageUsedIds.add(createBookIdentity(exact.title, exact.author));
+    }
+
+    const safe =
+      pickSeededUnique(
+        sortSafeCandidates(
+          genreSafeCandidates.filter(
+            (book) => book.score >= 3 && isSafeBook(book, preferences)
+          ),
+          preferences
+        ),
+        pageUsedIds,
+        4,
+        chainSeed,
+        page,
+        2
+      ) ||
+      pickSeededUnique(
+        sortSafeCandidates(
+          genreSafeCandidates.filter((book) => isSafeBook(book, preferences)),
+          preferences
+        ),
+        pageUsedIds,
+        4,
+        chainSeed,
+        page,
+        3
+      ) ||
+      pickSeededUnique(
+        sortSafeCandidates(
+          scoredBooks.filter(
+            (book) =>
+              isSafeBook(book, preferences) && isGenreCompatible(book, preferences)
+          ),
+          preferences
+        ),
+        pageUsedIds,
+        4,
+        chainSeed,
+        page,
+        4
+      ) ||
+      null;
+
+    if (safe) {
+      pageUsedIds.add(createBookIdentity(safe.title, safe.author));
+    }
+
+    const filteredStretchCandidates = stretchCandidates.filter((book) =>
+      hasDifferentTasteVector(book, exact, preferences)
+    );
+    const stretch =
+      pickSeededUnique(
+        filteredStretchCandidates,
+        pageUsedIds,
+        5,
+        chainSeed,
+        page,
+        5
+      ) ||
+      pickSeededUnique(
+        scoredBooks.filter(
+          (book) =>
+            (
+              !preferences.genre ||
+              preferences.genre === "any" ||
+              isStretchGenreCompatible(book, preferences)
+            ) && hasDifferentTasteVector(book, exact, preferences)
+        ),
+        pageUsedIds,
+        5,
+        chainSeed,
+        page,
+        6
+      ) ||
+      (
+        preferences.genre && preferences.genre !== "any"
+          ? null
+          : pickSeededUnique(scoredBooks, pageUsedIds, 5, chainSeed, page, 7)
+      ) ||
+      null;
+
+    currentPageRecommendations = {
+      exact,
+      safe,
+      stretch
+    };
+
+    for (const role of recommendationRoles) {
+      const book = currentPageRecommendations[role];
+
+      if (book) {
+        usedIds.add(createBookIdentity(book.title, book.author));
+      }
+    }
+  }
+
+  return currentPageRecommendations;
 }
 
 function recommendLocalBooks(preferences, limit = 3) {
@@ -726,7 +840,24 @@ function findLocalBooks(query, limit = 5) {
 }
 
 async function recommendBooks(preferences, options = {}) {
-  const roleRecommendations = buildRoleRecommendations(preferences);
+  const chainSeed = Number.isFinite(options.chainSeed) ? options.chainSeed : 0;
+  const chainPage = Number.isFinite(options.chainPage) ? options.chainPage : 0;
+
+  if (preferences.goal === "random") {
+    const randomBook = buildRandomChainRecommendation(chainSeed, chainPage);
+
+    return {
+      roleRecommendations: randomBook ? { exact: randomBook, safe: null, stretch: null } : null,
+      localRecommendations: randomBook ? [randomBook] : [],
+      externalRecommendations: [],
+      externalError: null
+    };
+  }
+
+  const roleRecommendations = buildRoleRecommendations(preferences, {
+    chainSeed,
+    chainPage
+  });
 
   if (roleRecommendations.exact || roleRecommendations.safe || roleRecommendations.stretch) {
     return {
