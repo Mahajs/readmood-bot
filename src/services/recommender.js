@@ -548,6 +548,29 @@ function pickSeededUnique(
   return topCandidates[createSelectionIndex(seed, page, salt, topCandidates.length)];
 }
 
+function createSeededRandomGenerator(seed) {
+  let state = (Number.isFinite(seed) ? seed : 0) + 1;
+
+  return function nextRandom() {
+    state = (state * 1664525 + 1013904223) % 4294967296;
+    return state / 4294967296;
+  };
+}
+
+function shuffleBooksBySeed(bookList, seed) {
+  const shuffled = [...bookList];
+  const nextRandom = createSeededRandomGenerator(seed);
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(nextRandom() * (index + 1));
+    const temp = shuffled[index];
+    shuffled[index] = shuffled[swapIndex];
+    shuffled[swapIndex] = temp;
+  }
+
+  return shuffled;
+}
+
 function expandCandidatePool(primaryCandidates, secondaryCandidates, minSize = 3) {
   const expanded = [...primaryCandidates];
   const existingIds = new Set(
@@ -628,12 +651,9 @@ function buildRandomChainRecommendation(seed = 0, page = 0) {
       createBookIdentity(b.title, b.author)
     )
   );
-  const rotationOffset = createSelectionIndex(seed, 0, 11, orderedPool.length);
-  const rotatedPool = orderedPool
-    .slice(rotationOffset)
-    .concat(orderedPool.slice(0, rotationOffset));
+  const shuffledPool = shuffleBooksBySeed(orderedPool, seed);
 
-  return rotatedPool[page % rotatedPool.length];
+  return shuffledPool[page % shuffledPool.length];
 }
 
 function buildRoleRecommendations(preferences, options = {}) {
