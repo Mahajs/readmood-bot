@@ -107,15 +107,27 @@ const randomRecommendationPlan = {
     "Кухня",
     "Полночная библиотека",
     "Вторая жизнь Уве",
-    "Гарри Поттер и философский камень"
-  ],
-  safe: [
-    "Вторая жизнь Уве",
-    "Хоббит, или Туда и обратно",
     "Гарри Поттер и философский камень",
     "Марсианин",
     "Автостопом по галактике",
-    "Чудеса универсама «Намиа»"
+    "Чудеса универсама «Намиа»",
+    "Последнее желание",
+    "Краткая история почти всего на свете",
+    "Атомные привычки"
+  ],
+  safe: [
+    "Проект «Аве Мария»",
+    "Песнь Ахилла",
+    "Цугуми",
+    "Приключения Шерлока Холмса",
+    "Убийство в Восточном экспрессе",
+    "Пьетро Легран",
+    "Эмоциональный интеллект",
+    "Сделано, чтобы прилипать",
+    "Эссенциализм",
+    "Одна привычка в неделю",
+    "Школа",
+    "Игры, в которые играют люди"
   ],
   stretch: [
     "Человек-комбини",
@@ -123,7 +135,12 @@ const randomRecommendationPlan = {
     "Кафка на пляже",
     "Имя ветра",
     "Ваш покорный слуга кот",
-    "Проект «Аве Мария»"
+    "451 градус по Фаренгейту",
+    "Три товарища",
+    "Токийский Зодиак",
+    "История искусства",
+    "Sapiens. Краткая история человечества",
+    "В работу с головой"
   ]
 };
 
@@ -653,7 +670,11 @@ function buildRandomChainRecommendation(seed = 0, page = 0) {
   );
   const shuffledPool = shuffleBooksBySeed(orderedPool, seed);
 
-  return shuffledPool[page % shuffledPool.length];
+  if (page >= shuffledPool.length) {
+    return null;
+  }
+
+  return shuffledPool[page];
 }
 
 function buildRoleRecommendations(preferences, options = {}) {
@@ -870,7 +891,9 @@ async function recommendBooks(preferences, options = {}) {
       roleRecommendations: randomBook ? { exact: randomBook, safe: null, stretch: null } : null,
       localRecommendations: randomBook ? [randomBook] : [],
       externalRecommendations: [],
-      externalError: null
+      externalError: null,
+      exhausted: !randomBook,
+      exhaustedKind: "random"
     };
   }
 
@@ -959,6 +982,13 @@ async function findBooks(query, options = {}) {
 
 function buildRecommendationMessage(preferences, recommendationSet) {
   if (recommendationSet.exhausted) {
+    if (recommendationSet.exhaustedKind === "random") {
+      return [
+        "Кажется, я уже перебрал все случайные варианты на этот заход.",
+        "Можно начать заново — тогда перемешаю книги по-новому."
+      ].join("\n\n");
+    }
+
     return "Похоже, я уже показал все подходящие варианты по этому запросу. Можно подобрать заново или вернуться в меню.";
   }
 
