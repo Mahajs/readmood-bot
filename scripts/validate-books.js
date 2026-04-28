@@ -2,35 +2,16 @@
 
 const path = require("path");
 const { books } = require(path.join(__dirname, "../src/data/books"));
+const {
+  requiredBookFields,
+  allowedBookGenres,
+  allowedBookPaces,
+  allowedBookComplexities,
+} = require(path.join(__dirname, "../src/data/bookSchema"));
 
-const requiredFields = [
-  "title",
-  "author",
-  "genre",
-  "mood",
-  "format",
-  "length",
-  "goal",
-  "description",
-  "recommendationText",
-  "vibe",
-  "themes",
-  "pace",
-  "complexity",
-];
-
-const allowedGenres = new Set([
-  "художественная литература",
-  "фэнтези",
-  "фантастика",
-  "психология",
-  "история",
-  "саморазвитие",
-  "продуктивность",
-]);
-
-const allowedPaces = new Set(["slow", "medium", "fast", "very_fast"]);
-const allowedComplexities = new Set(["low", "medium", "high"]);
+const allowedGenres = new Set(allowedBookGenres);
+const allowedPaces = new Set(allowedBookPaces);
+const allowedComplexities = new Set(allowedBookComplexities);
 
 function isBlank(value) {
   return typeof value === "string" && value.trim() === "";
@@ -75,7 +56,7 @@ function addError(errorsByBook, index, message) {
 }
 
 function validateRequiredFields(book, index, errorsByBook) {
-  for (const field of requiredFields) {
+  for (const field of requiredBookFields) {
     if (isEmpty(book[field])) {
       addError(errorsByBook, index, `отсутствует или пустое поле ${field}`);
     }
