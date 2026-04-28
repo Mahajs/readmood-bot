@@ -11,6 +11,18 @@ The working principle is simple:
 Внешние базы = поиск и справка
 ```
 
+## Product Scope
+
+ReadMoodBot is a small curated Telegram book recommendation bot with intentionally limited scope.
+
+It is meant to do three things well:
+
+1. recommend a book through a short guided flow
+2. help find a book or author through external search data
+3. offer editorial thematic collections
+
+It is not trying to become a Goodreads clone, a social reading platform, or a personal library tracker.
+
 ## User Flows
 
 Main entry points:
@@ -158,9 +170,16 @@ The webhook endpoint is:
 - `scripts/set-webhook.js` — register Telegram webhook
 - `scripts/delete-webhook.js` — remove Telegram webhook
 
-## Roadmap
+## Near-term / Before Stable v1
 
-- extract shared enums and schema into `bookSchema.js`
 - add explicit `randomEligible` support instead of keeping random participation only in code
-- introduce feedback modifiers for tuning future recommendations
-- continue expanding the local curated database
+- add book cover images in recommendations as small visual polish
+- improve small search details if the current search UX needs another pass
+
+## Out of Scope / Not Planned
+
+- user accounts
+- ratings and reviews
+- social features
+- personal reading tracker
+- large catalog platform features
