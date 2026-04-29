@@ -100,60 +100,8 @@ function allowsHeavySafeThemes(preferences) {
   );
 }
 
-const randomRecommendationPlan = {
-  exact: [
-    "Цветы для Элджернона",
-    "Хоббит, или Туда и обратно",
-    "Кухня",
-    "Полночная библиотека",
-    "Вторая жизнь Уве",
-    "Гарри Поттер и философский камень",
-    "Марсианин",
-    "Автостопом по галактике",
-    "Чудеса универсама «Намиа»",
-    "Последнее желание",
-    "Краткая история почти всего на свете",
-    "Атомные привычки"
-  ],
-  safe: [
-    "Проект «Аве Мария»",
-    "Песнь Ахилла",
-    "Цугуми",
-    "Приключения Шерлока Холмса",
-    "Убийство в Восточном экспрессе",
-    "Пьетро Легран",
-    "Эмоциональный интеллект",
-    "Сделано, чтобы прилипать",
-    "Эссенциализм",
-    "Одна привычка в неделю",
-    "Школа",
-    "Игры, в которые играют люди"
-  ],
-  stretch: [
-    "Человек-комбини",
-    "Жертва подозреваемого X",
-    "Кафка на пляже",
-    "Имя ветра",
-    "Ваш покорный слуга кот",
-    "451 градус по Фаренгейту",
-    "Три товарища",
-    "Токийский Зодиак",
-    "История искусства",
-    "Sapiens. Краткая история человечества",
-    "В работу с головой"
-  ]
-};
-
-const randomTopLimit = 6;
 const defaultTopLimit = 4;
 const recommendationRoles = ["exact", "safe", "stretch"];
-const randomRotationTitles = Array.from(
-  new Set([
-    ...randomRecommendationPlan.exact,
-    ...randomRecommendationPlan.safe,
-    ...randomRecommendationPlan.stretch
-  ])
-);
 
 const structuredGenreProfiles = {
   detective: {
@@ -610,54 +558,8 @@ function expandCandidatePool(primaryCandidates, secondaryCandidates, minSize = 3
   return expanded;
 }
 
-function findBookByTitle(title) {
-  return books.find((book) => book.title === title);
-}
-
-function pickRandomRecommendations(seed = 0, page = 0) {
-  const usedIds = new Set();
-  const randomPreferences = { goal: "random", vibe: "any" };
-  const exactCandidates = randomRecommendationPlan.exact
-    .map(findBookByTitle)
-    .filter(Boolean);
-  const safeCandidates = randomRecommendationPlan.safe
-    .map(findBookByTitle)
-    .filter((book) => book && isSafeBook(book, randomPreferences));
-  const stretchCandidates = randomRecommendationPlan.stretch
-    .map(findBookByTitle)
-    .filter((book) => book && !isHighComplexity(book));
-  const exact = pickSeededUnique(exactCandidates, usedIds, randomTopLimit, seed, page, 1);
-
-  if (exact) {
-    usedIds.add(createBookIdentity(exact.title, exact.author));
-  }
-
-  const safe = pickSeededUnique(safeCandidates, usedIds, randomTopLimit, seed, page, 2);
-
-  if (safe) {
-    usedIds.add(createBookIdentity(safe.title, safe.author));
-  }
-
-  const stretch = pickSeededUnique(
-    stretchCandidates,
-    usedIds,
-    randomTopLimit,
-    seed,
-    page,
-    3
-  );
-
-  return {
-    exact,
-    safe,
-    stretch
-  };
-}
-
 function buildRandomChainRecommendation(seed = 0, page = 0) {
-  const pool = randomRotationTitles
-    .map(findBookByTitle)
-    .filter(Boolean);
+  const pool = [...books];
 
   if (!pool.length) {
     return null;
@@ -680,10 +582,6 @@ function buildRandomChainRecommendation(seed = 0, page = 0) {
 function buildRoleRecommendations(preferences, options = {}) {
   const chainSeed = Number.isFinite(options.chainSeed) ? options.chainSeed : 0;
   const chainPage = Number.isFinite(options.chainPage) ? options.chainPage : 0;
-
-  if (preferences.goal === "random") {
-    return pickRandomRecommendations(chainSeed, chainPage);
-  }
 
   const scoredBooks = books
     .map((book) => ({
