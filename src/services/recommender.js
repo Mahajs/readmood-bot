@@ -536,6 +536,20 @@ function shuffleBooksBySeed(bookList, seed) {
   return shuffled;
 }
 
+function buildUniqueRandomPool(bookList) {
+  const uniqueBooks = new Map();
+
+  for (const book of bookList) {
+    const id = createBookIdentity(book.title, book.author);
+
+    if (!uniqueBooks.has(id)) {
+      uniqueBooks.set(id, book);
+    }
+  }
+
+  return [...uniqueBooks.values()];
+}
+
 function expandCandidatePool(primaryCandidates, secondaryCandidates, minSize = 3) {
   const expanded = [...primaryCandidates];
   const existingIds = new Set(
@@ -559,7 +573,7 @@ function expandCandidatePool(primaryCandidates, secondaryCandidates, minSize = 3
 }
 
 function buildRandomChainRecommendation(seed = 0, page = 0) {
-  const pool = [...books];
+  const pool = buildUniqueRandomPool(books);
 
   if (!pool.length) {
     return null;
