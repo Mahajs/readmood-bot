@@ -1133,6 +1133,8 @@ const books = [
       "Эпическое фэнтези о пути, дружбе, власти и стойкости перед тьмой.",
     recommendationText:
       "Большое путешествие, где есть дружба, страх, искушение, тьма на горизонте и маленькие существа, которым приходится тащить судьбу мира на себе.",
+    cover:
+      "https://books.google.com/books/content?id=GWorEAAAQBAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
     vibe: ["mysterious"],
     themes: ["путешествие", "дружба", "искушение"],
     pace: "medium",
@@ -1150,6 +1152,8 @@ const books = [
       "Теплое и остроумное фэнтези о магии, превращении и странном доме.",
     recommendationText:
       "История о внутреннем преображении, страхе, сложных выборах, доверии и любви — и все это внутри странного, живого и очень магического мира.",
+    cover:
+      "https://books.google.com/books/content?id=L4gQiFKBLwoC&printsec=frontcover&img=1&zoom=1&source=gbs_api",
     vibe: ["cozy"],
     themes: ["магия", "дом", "превращение"],
     pace: "medium",
@@ -1167,6 +1171,7 @@ const books = [
       "Странная и нервная фантастика о реальности, распаде привычного мира и паранойе.",
     recommendationText:
       "Подойдет, если хочется фантастики, которая быстро цепляет и при этом постоянно выбивает почву из-под ног.",
+    cover: "https://covers.openlibrary.org/b/olid/OL8132341M-L.jpg",
     vibe: ["mysterious"],
     themes: ["реальность", "паранойя", "сознание"],
     pace: "fast",
@@ -1184,6 +1189,8 @@ const books = [
       "Горький и ироничный роман о войне, времени и человеческой уязвимости.",
     recommendationText:
       "Роман Воннегута, где переплетаются война, абсурд, фантастика и горькая ирония — и все это ощущается слишком по-настоящему.",
+    cover:
+      "https://books.google.com/books/content?id=DLCSm6whrnEC&printsec=frontcover&img=1&zoom=1&source=gbs_api",
     vibe: ["melancholic"],
     themes: ["война", "время", "абсурд"],
     pace: "medium",
@@ -1201,6 +1208,8 @@ const books = [
       "Короткая сатирическая фантастика о науке, вере и очень опасных идеях.",
     recommendationText:
       "Сатирическая антиутопия о том, как научный прогресс без морали может очень быстро довести мир до конца.",
+    cover:
+      "https://books.google.com/books/content?id=xzSNEAAAQBAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
     vibe: ["light"],
     themes: ["наука", "вера", "абсурд"],
     pace: "fast",
@@ -1218,6 +1227,8 @@ const books = [
       "Жесткий роман о страхе, власти и распаде цивилизованных правил.",
     recommendationText:
       "Аллегорическая история о том, как быстро рушится цивилизация — и как зло оказывается не снаружи, а внутри даже тех, кого мы считаем невинными.",
+    cover:
+      "https://books.google.com/books/content?id=3C-4dsIGlEgC&printsec=frontcover&img=1&zoom=1&source=gbs_api",
     vibe: ["dark"],
     themes: ["власть", "страх", "цивилизация"],
     pace: "fast",
@@ -1235,6 +1246,8 @@ const books = [
       "Классический роман о любви, характере, самообмане и социальной игре.",
     recommendationText:
       "Классическая история о любви, характере, социальных различиях и том, как легко ошибиться в людях — и как сложно потом это признать.",
+    cover:
+      "https://books.google.com/books/content?id=5GbdTc9OJ78C&printsec=frontcover&img=1&zoom=1&source=gbs_api",
     vibe: ["light"],
     themes: ["любовь", "ирония", "общество"],
     pace: "medium",
@@ -1252,6 +1265,8 @@ const books = [
       "Спокойная и бережная история о письмах, повседневности и тихом исцелении.",
     recommendationText:
       "Роман о том, как важно сохранить в словах тепло человеческого дыхания, а в буквах — тепло руки, даже в мире, где все становится слишком быстрым и обезличенным.",
+    cover:
+      "https://books.google.com/books/content?id=okGOEQAAQBAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api",
     vibe: ["quiet"],
     themes: ["письма", "повседневность", "исцеление"],
     pace: "slow",
