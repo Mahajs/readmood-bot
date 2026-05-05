@@ -422,6 +422,16 @@ async function sendRecommendations(bot, chatId, session, currentRecommendationSt
       session,
       nextRecommendationState,
     );
+
+    if (randomBook && randomBook.cover) {
+      await bot.sendPhoto(chatId, randomBook.cover, {
+        caption: message,
+        reply_markup: {
+          inline_keyboard: keyboard,
+        },
+      });
+      return;
+    }
   }
 
   await bot.sendMessage(
