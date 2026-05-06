@@ -222,6 +222,28 @@ function buildMoreRecommendationsCallbackData(session, recommendationState) {
   )}`;
 }
 
+function resolveBookCoverUrl(cover) {
+  if (!cover || typeof cover !== "string") {
+    return null;
+  }
+
+  if (cover.startsWith("http://") || cover.startsWith("https://")) {
+    return cover;
+  }
+
+  if (!cover.startsWith("/covers/")) {
+    return null;
+  }
+
+  const baseUrl = process.env.WEBHOOK_BASE_URL;
+
+  if (!baseUrl) {
+    return null;
+  }
+
+  return `${baseUrl.replace(/\/+$/, "")}${cover}`;
+}
+
 function buildPreferences(session) {
   return Object.fromEntries(
     sessionSchema.map(({ key }) => [
@@ -423,8 +445,10 @@ async function sendRecommendations(bot, chatId, session, currentRecommendationSt
       nextRecommendationState,
     );
 
-    if (randomBook && randomBook.cover) {
-      await bot.sendPhoto(chatId, randomBook.cover, {
+    const coverUrl = randomBook ? resolveBookCoverUrl(randomBook.cover) : null;
+
+    if (coverUrl) {
+      await bot.sendPhoto(chatId, coverUrl, {
         caption: message,
         reply_markup: {
           inline_keyboard: keyboard,
