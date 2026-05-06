@@ -1171,7 +1171,7 @@ const books = [
       "Странная и нервная фантастика о реальности, распаде привычного мира и паранойе.",
     recommendationText:
       "Подойдет, если хочется фантастики, которая быстро цепляет и при этом постоянно выбивает почву из-под ног.",
-    cover: "https://covers.openlibrary.org/b/olid/OL8132341M-L.jpg",
+    cover: "/covers/ubik.jpg",
     vibe: ["mysterious"],
     themes: ["реальность", "паранойя", "сознание"],
     pace: "fast",
