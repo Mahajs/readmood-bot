@@ -448,13 +448,21 @@ async function sendRecommendations(bot, chatId, session, currentRecommendationSt
     const coverUrl = randomBook ? resolveBookCoverUrl(randomBook.cover) : null;
 
     if (coverUrl) {
-      await bot.sendPhoto(chatId, coverUrl, {
-        caption: message,
-        reply_markup: {
-          inline_keyboard: keyboard,
-        },
-      });
-      return;
+      try {
+        await bot.sendPhoto(chatId, coverUrl, {
+          caption: message,
+          reply_markup: {
+            inline_keyboard: keyboard,
+          },
+        });
+        return;
+      } catch (error) {
+        console.error("Random cover send failed, falling back to text", {
+          chatId,
+          coverUrl,
+          error: error?.message,
+        });
+      }
     }
   }
 
