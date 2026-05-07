@@ -42,6 +42,7 @@ const books = [
     description: "Трогательная история о разуме, человечности и цене перемен.",
     recommendationText:
       "Трогательная история о разуме, человечности и цене перемен.",
+    cover: "/covers/flowers-for-algernon.jpg",
     vibe: ["reflective"],
     themes: ["человечность", "одиночество", "сострадание"],
     pace: "medium",
@@ -60,6 +61,7 @@ const books = [
       "История о сожалениях, выборе и возможности посмотреть на жизнь иначе.",
     recommendationText:
       "История о сожалениях, выборе и возможности посмотреть на жизнь иначе.",
+    cover: "/covers/midnight-library.jpg",
     vibe: ["uplifting"],
     themes: ["выбор", "сожаление", "надежда"],
     pace: "medium",
@@ -76,6 +78,7 @@ const books = [
     description: "Теплый роман о человеке, одиночестве и неожиданной близости.",
     recommendationText:
       "Теплый роман о человеке, одиночестве и неожиданной близости.",
+    cover: "/covers/a-man-called-ove.jpg",
     vibe: ["warm"],
     themes: ["дружба", "исцеление", "тепло"],
     pace: "medium",
@@ -125,6 +128,7 @@ const books = [
     description: "Классическое приключение с теплой атмосферой и ярким миром.",
     recommendationText:
       "Классическое приключение с теплой атмосферой и ярким миром.",
+    cover: "/covers/the-hobbit.jpg",
     vibe: ["cozy"],
     themes: ["приключение", "дружба", "дом"],
     pace: "medium",
@@ -222,6 +226,7 @@ const books = [
     description: "Выживание на Марсе, инженерное мышление и отличный темп.",
     recommendationText:
       "Выживание на Марсе, инженерное мышление и отличный темп.",
+    cover: "/covers/the-martian.jpg",
     vibe: ["light"],
     themes: ["выживание", "наука", "юмор"],
     pace: "fast",
@@ -238,6 +243,7 @@ const books = [
     description: "Динамичная научная фантастика с юмором, тайной и дружбой.",
     recommendationText:
       "Динамичная научная фантастика с юмором, тайной и дружбой.",
+    cover: "/covers/project-hail-mary.jpg",
     vibe: ["light"],
     themes: ["наука", "дружба", "юмор"],
     pace: "fast",
@@ -270,6 +276,7 @@ const books = [
     goal: ["отдохнуть", "вдохновиться"],
     description: "Ироничное и очень легкое космическое приключение.",
     recommendationText: "Ироничное и очень легкое космическое приключение.",
+    cover: "/covers/hitchhikers-guide.jpg",
     vibe: ["light"],
     themes: ["юмор", "приключение", "абсурд"],
     pace: "fast",
@@ -812,6 +819,7 @@ const books = [
       "Ироничный роман-наблюдение за людьми, обществом и бытовыми нелепостями.",
     recommendationText:
       "Если хочется японской классики, но без тяжести, эта книга дает умный юмор и очень живой взгляд на людей.",
+    cover: "/covers/i-am-a-cat.jpg",
     vibe: ["light"],
     themes: ["общество", "юмор", "повседневность"],
     pace: "medium",
@@ -965,6 +973,7 @@ const books = [
       "Интеллектуальный японский детектив с сильной психологической линией.",
     recommendationText:
       "Если хочется сюжета, напряжения и умной интриги без пустой беготни, это отличный вариант.",
+    cover: "/covers/devotion-of-suspect-x.jpg",
     vibe: ["tense"],
     themes: ["детектив", "тайна", "справедливость", "моральный выбор"],
     pace: "fast",
@@ -1118,6 +1127,7 @@ const books = [
       "Теплая история с элементами магического реализма о помощи, выборе и времени.",
     recommendationText:
       "Это очень хороший выбор, если хочется доброй, человечной книги, после которой становится чуть светлее.",
+    cover: "/covers/miracles-of-namiya.jpg",
     vibe: ["warm"],
     themes: ["помощь", "выбор", "надежда"],
     pace: "medium",
