@@ -10,6 +10,7 @@ const books = [
     description: "Антиутопия о контроле, власти и хрупкости личной свободы.",
     recommendationText:
       "Антиутопия о контроле, власти и хрупкости личной свободы.",
+    cover: "/covers/1984.jpg",
     vibe: ["dark"],
     themes: ["контроль", "свобода", "страх"],
     pace: "medium",
@@ -26,6 +27,7 @@ const books = [
     description: "Короткая и острая притча о власти, манипуляции и политике.",
     recommendationText:
       "Короткая и острая притча о власти, манипуляции и политике.",
+    cover: "/covers/animal-farm.jpg",
     vibe: ["tense"],
     themes: ["власть", "манипуляция", "общество"],
     pace: "fast",
@@ -145,6 +147,7 @@ const books = [
     description: "Легкое магическое чтение с ярким миром и чувством чуда.",
     recommendationText:
       "Легкое магическое чтение с ярким миром и чувством чуда.",
+    cover: "/covers/harry-potter-philosophers-stone.jpg",
     vibe: ["cozy"],
     themes: ["магия", "дружба", "взросление"],
     pace: "medium",
@@ -162,6 +165,7 @@ const books = [
       "Красиво написанное фэнтези с сильной атмосферой и легендой героя.",
     recommendationText:
       "Красиво написанное фэнтези с сильной атмосферой и легендой героя.",
+    cover: "/covers/name-of-the-wind.jpg",
     vibe: ["mysterious"],
     themes: ["магия", "история", "приключение"],
     pace: "medium",
@@ -178,6 +182,7 @@ const books = [
     description: "Сборник о ведьмаке с динамикой, иронией и мрачным колоритом.",
     recommendationText:
       "Сборник о ведьмаке с динамикой, иронией и мрачным колоритом.",
+    cover: "/covers/last-wish.jpg",
     vibe: ["tense"],
     themes: ["приключение", "ирония", "магия"],
     pace: "fast",
@@ -194,6 +199,7 @@ const books = [
     description: "Лиричный роман по мотивам мифа о дружбе, любви и судьбе.",
     recommendationText:
       "Лиричный роман по мотивам мифа о дружбе, любви и судьбе.",
+    cover: "/covers/song-of-achilles-clean.png",
     vibe: ["melancholic"],
     themes: ["любовь", "судьба", "мифология"],
     pace: "slow",
@@ -210,6 +216,7 @@ const books = [
     description: "Масштабная научная фантастика о власти, судьбе и выживании.",
     recommendationText:
       "Масштабная научная фантастика о власти, судьбе и выживании.",
+    cover: "/covers/dune.jpg",
     vibe: ["mysterious"],
     themes: ["власть", "судьба", "выживание"],
     pace: "slow",
@@ -261,6 +268,7 @@ const books = [
       "Серьезная научная фантастика с большими идеями и космическим масштабом.",
     recommendationText:
       "Серьезная научная фантастика с большими идеями и космическим масштабом.",
+    cover: "/covers/three-body-problem.jpg",
     vibe: ["mysterious"],
     themes: ["наука", "космос", "цивилизация"],
     pace: "slow",
@@ -292,6 +300,7 @@ const books = [
     goal: ["подумать", "узнать новое"],
     description: "Антиутопия о цензуре, памяти и том, зачем нам книги.",
     recommendationText: "Антиутопия о цензуре, памяти и том, зачем нам книги.",
+    cover: "/covers/fahrenheit-451.jpg",
     vibe: ["tense"],
     themes: ["цензура", "свобода мысли", "общество"],
     pace: "fast",
@@ -618,6 +627,7 @@ const books = [
       "Мрачный и очень личный роман о стыде, одиночестве и саморазрушении.",
     recommendationText:
       "Если хочется тяжелой, честной и очень внутренней прозы, это одна из самых сильных японских книг для такого настроения.",
+    cover: "/covers/no-longer-human.jpg",
     vibe: ["melancholic"],
     themes: ["одиночество", "отчуждение", "саморазрушение"],
     pace: "slow",
