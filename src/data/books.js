@@ -201,7 +201,7 @@ const books = [
     description: "Лиричный роман по мотивам мифа о дружбе, любви и судьбе.",
     recommendationText:
       "Лиричный роман по мотивам мифа о дружбе, любви и судьбе.",
-    cover: "/covers/song-of-achilles-clean.png",
+    cover: "/covers/song-of-achilles.jpg",
     vibe: ["melancholic"],
     themes: ["любовь", "судьба", "мифология"],
     pace: "slow",
@@ -536,7 +536,7 @@ const books = [
       "Небольшая проза с тонким наблюдением за повседневностью и внутренней жизнью.",
     recommendationText:
       "Хороший вариант, если хочется начать знакомство с Дадзаем с более короткого и мягкого текста.",
-    cover: "/covers/school-dazai.jpg",
+    cover: "/covers/schoolgirl.jpg",
     vibe: ["quiet"],
     themes: ["повседневность", "внутренний мир", "наблюдение"],
     pace: "medium",
