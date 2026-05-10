@@ -1,4 +1,5 @@
 const TelegramBot = require("node-telegram-bot-api");
+const { books } = require("./data/books");
 const {
   recommendBooks,
   buildRecommendationMessage,
@@ -22,6 +23,7 @@ const pollingBots = new Map();
 let webhookBot = null;
 const recommendationSeedKey = "s";
 const recommendationPageKey = "n";
+const bookCardPrefix = "book:";
 
 const optionCatalog = {
   goal: {
@@ -244,6 +246,48 @@ function resolveBookCoverUrl(cover) {
   return `${baseUrl.replace(/\/+$/, "")}${cover}`;
 }
 
+function buildBookCardMessage(book, options = {}) {
+  const blocks = [];
+
+  if (options.lead) {
+    blocks.push(options.lead);
+  }
+
+  blocks.push(`«${book.title}» — ${book.author}`);
+  blocks.push(book.recommendationText || book.description);
+
+  return blocks.join("\n\n");
+}
+
+async function sendBookCard(bot, chatId, book, keyboard, options = {}) {
+  const message = buildBookCardMessage(book, options);
+  const coverUrl = resolveBookCoverUrl(book.cover);
+
+  if (coverUrl) {
+    try {
+      await bot.sendPhoto(chatId, coverUrl, {
+        caption: message,
+        reply_markup: {
+          inline_keyboard: keyboard,
+        },
+      });
+      return;
+    } catch (error) {
+      console.error("Book cover send failed, falling back to text", {
+        chatId,
+        coverUrl,
+        error: error?.message,
+      });
+    }
+  }
+
+  await bot.sendMessage(chatId, message, {
+    reply_markup: {
+      inline_keyboard: keyboard,
+    },
+  });
+}
+
 function buildPreferences(session) {
   return Object.fromEntries(
     sessionSchema.map(({ key }) => [
@@ -296,6 +340,66 @@ function buildRecommendationsKeyboard(session, recommendationState) {
     ],
     [{ text: "🔄 Подобрать заново", callback_data: "start_pick" }],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
+  ];
+}
+
+function buildBookCardCallbackData(book, session, recommendationState) {
+  const bookIndex = books.findIndex(
+    (candidate) =>
+      candidate.title === book.title && candidate.author === book.author,
+  );
+
+  if (bookIndex < 0) {
+    return null;
+  }
+
+  return `${bookCardPrefix}${bookIndex.toString(36)}:${serializeRecommendationState(
+    session,
+    recommendationState,
+  )}`;
+}
+
+function buildRecommendationChoiceKeyboard(
+  recommendations,
+  session,
+  recommendationState,
+) {
+  const roleButtons = [
+    {
+      emoji: "📘",
+      book: recommendations.roleRecommendations?.exact,
+    },
+    {
+      emoji: "🌿",
+      book: recommendations.roleRecommendations?.safe,
+    },
+    {
+      emoji: "✨",
+      book: recommendations.roleRecommendations?.stretch,
+    },
+  ]
+    .filter(({ book }) => Boolean(book))
+    .map(({ emoji, book }) => {
+      const callbackData = buildBookCardCallbackData(
+        book,
+        session,
+        recommendationState,
+      );
+
+      if (!callbackData) {
+        return null;
+      }
+
+      return {
+        text: `${emoji} ${book.title}`,
+        callback_data: callbackData,
+      };
+    })
+    .filter(Boolean);
+
+  return [
+    ...roleButtons.map((button) => [button]),
+    ...buildRecommendationsKeyboard(session, recommendationState),
   ];
 }
 
@@ -445,25 +549,18 @@ async function sendRecommendations(bot, chatId, session, currentRecommendationSt
       nextRecommendationState,
     );
 
-    const coverUrl = randomBook ? resolveBookCoverUrl(randomBook.cover) : null;
-
-    if (coverUrl) {
-      try {
-        await bot.sendPhoto(chatId, coverUrl, {
-          caption: message,
-          reply_markup: {
-            inline_keyboard: keyboard,
-          },
-        });
-        return;
-      } catch (error) {
-        console.error("Random cover send failed, falling back to text", {
-          chatId,
-          coverUrl,
-          error: error?.message,
-        });
-      }
+    if (randomBook) {
+      await sendBookCard(bot, chatId, randomBook, keyboard, {
+        lead: "🎲 Сегодня я бы предложил тебе:",
+      });
+      return;
     }
+  } else {
+    keyboard = buildRecommendationChoiceKeyboard(
+      recommendations,
+      session,
+      nextRecommendationState,
+    );
   }
 
   await bot.sendMessage(
@@ -475,6 +572,16 @@ async function sendRecommendations(bot, chatId, session, currentRecommendationSt
       },
     },
   );
+}
+
+function findBookByCallbackId(callbackId) {
+  const bookIndex = Number.parseInt(callbackId, 36);
+
+  if (!Number.isFinite(bookIndex) || bookIndex < 0) {
+    return null;
+  }
+
+  return books[bookIndex] || null;
 }
 
 async function sendStep(bot, chatId, session) {
@@ -730,6 +837,35 @@ async function handleCallbackQuery(bot, query) {
     });
     await bot.answerCallbackQuery(query.id);
     await sendRecommendations(bot, chatId, session, recommendationState);
+    return;
+  }
+
+  if (data.startsWith(bookCardPrefix)) {
+    const payload = data.slice(bookCardPrefix.length);
+    const separatorIndex = payload.indexOf(":");
+    const bookId =
+      separatorIndex >= 0 ? payload.slice(0, separatorIndex) : payload;
+    const statePayload =
+      separatorIndex >= 0 ? payload.slice(separatorIndex + 1) : "";
+    const book = findBookByCallbackId(bookId);
+
+    if (!book) {
+      await bot.answerCallbackQuery(query.id, {
+        text: "Не получилось открыть карточку книги.",
+      });
+      return;
+    }
+
+    const { session, recommendationState } =
+      deserializeRecommendationState(statePayload);
+
+    await bot.answerCallbackQuery(query.id);
+    await sendBookCard(
+      bot,
+      chatId,
+      book,
+      buildRecommendationsKeyboard(session, recommendationState),
+    );
     return;
   }
 
