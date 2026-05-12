@@ -441,6 +441,7 @@ function buildHelpKeyboard() {
 
 function buildSearchResultKeyboard() {
   return [
+    [{ text: "📚 Найти другую книгу", callback_data: "start_find" }],
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
     [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
