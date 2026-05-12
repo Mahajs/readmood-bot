@@ -353,6 +353,10 @@ function buildBookCardCallbackData(book, session, recommendationState) {
     return null;
   }
 
+  if (!session && !recommendationState) {
+    return `${bookCardPrefix}${bookIndex.toString(36)}`;
+  }
+
   return `${bookCardPrefix}${bookIndex.toString(36)}:${serializeRecommendationState(
     session,
     recommendationState,
@@ -441,6 +445,22 @@ function buildSearchResultKeyboard() {
     [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
   ];
+}
+
+function buildSearchResultsKeyboard(localResults = []) {
+  const bookButtons = localResults
+    .map((book) => {
+      const callbackData = buildBookCardCallbackData(book);
+
+      if (!callbackData) {
+        return null;
+      }
+
+      return [{ text: `📘 ${book.title}`, callback_data: callbackData }];
+    })
+    .filter(Boolean);
+
+  return [...bookButtons, ...buildSearchResultKeyboard()];
 }
 
 function buildCollectionsMenuKeyboard() {
@@ -638,6 +658,19 @@ async function handleRestart(bot, chatId) {
   await sendStep(bot, chatId, createEmptySession());
 }
 
+async function sendSearchResults(bot, chatId, query) {
+  await bot.sendMessage(chatId, `Ищу книги по запросу: ${query}`);
+
+  const searchResult = await findBooks(query);
+  const message = buildFindBooksMessage(query, searchResult);
+
+  await bot.sendMessage(chatId, message, {
+    reply_markup: {
+      inline_keyboard: buildSearchResultsKeyboard(searchResult.localResults),
+    },
+  });
+}
+
 async function handleFind(bot, chatId, text) {
   const query = extractCommandArgument(text);
   console.log("Handling /find", { chatId, query });
@@ -655,14 +688,20 @@ async function handleFind(bot, chatId, text) {
     return;
   }
 
-  await bot.sendMessage(chatId, `Ищу книги по запросу: ${query}`);
-  const searchResult = await findBooks(query);
-  const message = buildFindBooksMessage(query, searchResult);
-  await bot.sendMessage(chatId, message, {
-    reply_markup: {
-      inline_keyboard: buildSearchResultKeyboard(),
-    },
-  });
+  try {
+    await sendSearchResults(bot, chatId, query);
+  } catch (error) {
+    console.error("Search flow failed", { chatId, query, error: error?.message });
+    await bot.sendMessage(
+      chatId,
+      "Не смогла выполнить поиск. Попробуй еще раз чуть позже или введи другой запрос.",
+      {
+        reply_markup: {
+          inline_keyboard: buildSearchResultKeyboard(),
+        },
+      },
+    );
+  }
 }
 
 async function handleFindQuery(bot, chatId, query) {
@@ -677,14 +716,24 @@ async function handleFindQuery(bot, chatId, query) {
     return;
   }
 
-  await bot.sendMessage(chatId, `Ищу книги по запросу: ${trimmedQuery}`);
-  const searchResult = await findBooks(trimmedQuery);
-  const message = buildFindBooksMessage(trimmedQuery, searchResult);
-  await bot.sendMessage(chatId, message, {
-    reply_markup: {
-      inline_keyboard: buildSearchResultKeyboard(),
-    },
-  });
+  try {
+    await sendSearchResults(bot, chatId, trimmedQuery);
+  } catch (error) {
+    console.error("Search flow failed", {
+      chatId,
+      query: trimmedQuery,
+      error: error?.message,
+    });
+    await bot.sendMessage(
+      chatId,
+      "Не смогла выполнить поиск. Попробуй еще раз чуть позже или введи другой запрос.",
+      {
+        reply_markup: {
+          inline_keyboard: buildSearchResultKeyboard(),
+        },
+      },
+    );
+  }
 }
 
 async function handleHelp(bot, chatId) {
@@ -748,7 +797,15 @@ async function handleMessage(bot, message) {
   }
 
   if (!command) {
-    await handleFindQuery(bot, chatId, message.text);
+    await bot.sendMessage(
+      chatId,
+      "Я пока понимаю команды и кнопки. Чтобы найти книгу, нажми «📚 Найти книгу» или используй /find название.",
+      {
+        reply_markup: {
+          inline_keyboard: buildSearchResultKeyboard(),
+        },
+      },
+    );
   }
 }
 
@@ -858,13 +915,16 @@ async function handleCallbackQuery(bot, query) {
 
     const { session, recommendationState } =
       deserializeRecommendationState(statePayload);
+    const keyboard = statePayload
+      ? buildRecommendationsKeyboard(session, recommendationState)
+      : buildSearchResultKeyboard();
 
     await bot.answerCallbackQuery(query.id);
     await sendBookCard(
       bot,
       chatId,
       book,
-      buildRecommendationsKeyboard(session, recommendationState),
+      keyboard,
     );
     return;
   }
