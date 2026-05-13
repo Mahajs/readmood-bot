@@ -323,7 +323,6 @@ function buildStepKeyboard(step, session) {
 function buildStartKeyboard() {
   return [
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
-    [{ text: "📚 Найти книгу", callback_data: "start_find" }],
     [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
     [{ text: "ℹ️ Как это работает", callback_data: "start_help" }],
   ];
@@ -461,7 +460,6 @@ function buildExhaustedRecommendationsKeyboard() {
 function buildHelpKeyboard() {
   return [
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
-    [{ text: "📚 Найти книгу", callback_data: "start_find" }],
     [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
   ];
@@ -495,7 +493,6 @@ function buildSearchResultsKeyboard(localResults = []) {
 function buildAuthorInfoKeyboard(authorUrl) {
   return [
     [{ text: "📖 Открыть Wikipedia", url: authorUrl }],
-    [{ text: "📚 Найти другую книгу", callback_data: "start_find" }],
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
     [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
@@ -647,6 +644,55 @@ async function resolveRussianWikipediaAuthorUrl(author) {
   const fallbackUrl = `https://ru.wikipedia.org/wiki/${encodeURIComponent(
     String(author || "").replace(/ /g, "_"),
   )}`;
+  const normalizeWikipediaText = (value) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/ё/g, "е")
+      .replace(/\s+/g, " ")
+      .trim();
+  const extractAuthorSurname = (value) => {
+    const parts = normalizeWikipediaText(value)
+      .split(" ")
+      .map((part) => part.replace(/\./g, "").trim())
+      .filter(Boolean)
+      .filter((part) => part.length > 1);
+
+    return parts.length ? parts[parts.length - 1] : "";
+  };
+  const scoreWikipediaResult = (title, normalizedAuthor, surname) => {
+    const normalizedTitle = normalizeWikipediaText(title);
+    let score = 0;
+
+    if (normalizedTitle === normalizedAuthor) {
+      score += 100;
+    }
+
+    if (normalizedTitle.includes(normalizedAuthor)) {
+      score += 80;
+    }
+
+    if (normalizedAuthor.includes(normalizedTitle)) {
+      score += 60;
+    }
+
+    if (!title.includes(":")) {
+      score += 20;
+    }
+
+    if (title.includes(":")) {
+      score -= 30;
+    }
+
+    if (/(биография|библиография|список|экранизац)/i.test(title)) {
+      score -= 40;
+    }
+
+    if (surname && normalizedTitle.includes(surname)) {
+      score += 30;
+    }
+
+    return score;
+  };
 
   try {
     const response = await fetch(
@@ -670,14 +716,31 @@ async function resolveRussianWikipediaAuthorUrl(author) {
       };
     }
 
-    const normalizedAuthor = String(author || "").toLowerCase();
-    const preferredResult =
-      results.find((result) =>
-        String(result?.title || "")
-          .toLowerCase()
-          .includes(normalizedAuthor.split(" ")[0] || normalizedAuthor),
-      ) || results[0];
-    const title = preferredResult.title;
+    const normalizedAuthor = normalizeWikipediaText(author);
+    const surname = extractAuthorSurname(author);
+    const rankedResults = results
+      .map((result) => ({
+        ...result,
+        score: scoreWikipediaResult(result?.title || "", normalizedAuthor, surname),
+      }))
+      .sort((a, b) => b.score - a.score);
+    const preferredResult = rankedResults[0];
+    const title = preferredResult?.title || author;
+    const normalizedTitle = normalizeWikipediaText(title);
+    const lowConfidence =
+      !preferredResult ||
+      preferredResult.score < 50 ||
+      title.includes(":") ||
+      (surname && !normalizedTitle.includes(surname));
+
+    if (lowConfidence) {
+      return {
+        title: author,
+        url: fallbackUrl,
+        found: false,
+      };
+    }
+
     const url = `https://ru.wikipedia.org/wiki/${encodeURIComponent(
       title.replace(/ /g, "_"),
     )}`;
@@ -750,7 +813,7 @@ async function handleStart(bot, chatId) {
     [
       "Привет. Я ReadMoodBot.",
       "Помогаю подобрать книгу под твое состояние: настроение, жанр, атмосферу и темп.",
-      "Можно пройти короткий опрос, найти конкретную книгу или открыть авторские подборки.",
+      "Можно пройти короткий опрос, открыть авторские подборки или выбрать книгу из готовых карточек.",
     ].join("\n\n"),
     {
       reply_markup: {
@@ -851,8 +914,9 @@ async function handleHelp(bot, chatId) {
     [
       "Что я умею",
       "📖 Подобрать книгу — если хочется найти чтение под настроение, атмосферу и темп.",
-      "📚 Найти книгу — если ты ищешь конкретного автора или название.",
       "✨ Авторские подборки — если хочется выбирать не по настроению, а по теме, жанру или читательскому интересу.",
+      "🎲 Случайная книга — если хочется неожиданного, но все еще curated-варианта.",
+      "👤 Карточки книг и кнопка «Об авторе» — чтобы быстро перейти от рекомендации к самой книге и дальше к контексту автора.",
       "После рекомендаций можно нажать «Еще варианты» — я покажу другую тройку без нового опроса.",
       "Если не знаешь, с чего начать, нажми «Что почитать?».",
     ].join("\n\n"),
@@ -959,7 +1023,7 @@ async function handleCallbackQuery(bot, query) {
       chatId,
       [
         "Как это работает",
-        "Я могу подобрать книгу через короткий опрос, найти конкретного автора или показать авторские подборки.",
+        "Я могу подобрать книгу через короткий опрос, показать авторские подборки и дать карточки книг с переходом к автору.",
         "Подбор строится не только по жанру: я смотрю на атмосферу, темп и то, чего тебе сейчас хочется от чтения.",
       ].join("\n\n"),
       {
