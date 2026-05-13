@@ -642,12 +642,75 @@ function findBookByCallbackId(callbackId) {
   return books[bookIndex] || null;
 }
 
-function buildAuthorInfoMessage(author) {
-  const encodedAuthor = encodeURIComponent(author);
+async function resolveRussianWikipediaAuthorUrl(author) {
+  const fallbackUrl = `https://ru.wikipedia.org/wiki/${encodeURIComponent(
+    String(author || "").replace(/ /g, "_"),
+  )}`;
+
+  try {
+    const response = await fetch(
+      `https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+        author,
+      )}&format=json&origin=*`,
+    );
+
+    if (!response.ok) {
+      throw new Error(`Wikipedia request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const results = Array.isArray(data?.query?.search) ? data.query.search : [];
+
+    if (!results.length) {
+      return {
+        title: author,
+        url: fallbackUrl,
+        found: false,
+      };
+    }
+
+    const normalizedAuthor = String(author || "").toLowerCase();
+    const preferredResult =
+      results.find((result) =>
+        String(result?.title || "")
+          .toLowerCase()
+          .includes(normalizedAuthor.split(" ")[0] || normalizedAuthor),
+      ) || results[0];
+    const title = preferredResult.title;
+    const url = `https://ru.wikipedia.org/wiki/${encodeURIComponent(
+      title.replace(/ /g, "_"),
+    )}`;
+
+    return {
+      title,
+      url,
+      found: true,
+    };
+  } catch (error) {
+    console.warn("Wikipedia author lookup failed", {
+      author,
+      error: error?.message,
+    });
+
+    return {
+      title: author,
+      url: fallbackUrl,
+      found: false,
+    };
+  }
+}
+
+function buildAuthorInfoMessage(author, resolvedAuthor) {
+  if (resolvedAuthor.found) {
+    return [
+      `👤 ${author}`,
+      `Нашла страницу в Wikipedia:\n${resolvedAuthor.url}`,
+    ].join("\n\n");
+  }
 
   return [
     `👤 ${author}`,
-    `Можно начать отсюда:\nhttps://ru.wikipedia.org/wiki/${encodedAuthor}`,
+    `Не уверена, что нашла точную страницу, но можно начать отсюда:\n${resolvedAuthor.url}`,
   ].join("\n\n");
 }
 
@@ -986,12 +1049,18 @@ async function handleCallbackQuery(bot, query) {
       return;
     }
 
+    const resolvedAuthor = await resolveRussianWikipediaAuthorUrl(book.author);
+
     await bot.answerCallbackQuery(query.id);
-    await bot.sendMessage(chatId, buildAuthorInfoMessage(book.author), {
+    await bot.sendMessage(
+      chatId,
+      buildAuthorInfoMessage(book.author, resolvedAuthor),
+      {
       reply_markup: {
         inline_keyboard: buildAuthorInfoKeyboard(),
       },
-    });
+      },
+    );
     return;
   }
 
