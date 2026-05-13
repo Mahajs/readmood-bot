@@ -492,8 +492,9 @@ function buildSearchResultsKeyboard(localResults = []) {
   return [...bookButtons, ...buildSearchResultKeyboard()];
 }
 
-function buildAuthorInfoKeyboard() {
+function buildAuthorInfoKeyboard(authorUrl) {
   return [
+    [{ text: "📖 Открыть Wikipedia", url: authorUrl }],
     [{ text: "📚 Найти другую книгу", callback_data: "start_find" }],
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
     [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
@@ -702,15 +703,12 @@ async function resolveRussianWikipediaAuthorUrl(author) {
 
 function buildAuthorInfoMessage(author, resolvedAuthor) {
   if (resolvedAuthor.found) {
-    return [
-      `👤 ${author}`,
-      `Нашла страницу в Wikipedia:\n${resolvedAuthor.url}`,
-    ].join("\n\n");
+    return [`👤 ${author}`, "Нашла страницу в Wikipedia."].join("\n\n");
   }
 
   return [
     `👤 ${author}`,
-    `Не уверена, что нашла точную страницу, но можно начать отсюда:\n${resolvedAuthor.url}`,
+    "Не уверена, что нашла точную страницу, но можно начать отсюда.",
   ].join("\n\n");
 }
 
@@ -1057,7 +1055,7 @@ async function handleCallbackQuery(bot, query) {
       buildAuthorInfoMessage(book.author, resolvedAuthor),
       {
       reply_markup: {
-        inline_keyboard: buildAuthorInfoKeyboard(),
+        inline_keyboard: buildAuthorInfoKeyboard(resolvedAuthor.url),
       },
       },
     );
