@@ -24,6 +24,7 @@ let webhookBot = null;
 const recommendationSeedKey = "s";
 const recommendationPageKey = "n";
 const bookCardPrefix = "book:";
+const authorCardPrefix = "author:";
 
 const optionCatalog = {
   goal: {
@@ -262,13 +263,14 @@ function buildBookCardMessage(book, options = {}) {
 async function sendBookCard(bot, chatId, book, keyboard, options = {}) {
   const message = buildBookCardMessage(book, options);
   const coverUrl = resolveBookCoverUrl(book.cover);
+  const inlineKeyboard = buildBookCardKeyboard(book, keyboard);
 
   if (coverUrl) {
     try {
       await bot.sendPhoto(chatId, coverUrl, {
         caption: message,
         reply_markup: {
-          inline_keyboard: keyboard,
+          inline_keyboard: inlineKeyboard,
         },
       });
       return;
@@ -283,7 +285,7 @@ async function sendBookCard(bot, chatId, book, keyboard, options = {}) {
 
   await bot.sendMessage(chatId, message, {
     reply_markup: {
-      inline_keyboard: keyboard,
+      inline_keyboard: inlineKeyboard,
     },
   });
 }
@@ -361,6 +363,32 @@ function buildBookCardCallbackData(book, session, recommendationState) {
     session,
     recommendationState,
   )}`;
+}
+
+function buildAuthorCallbackData(book) {
+  const bookIndex = books.findIndex(
+    (candidate) =>
+      candidate.title === book.title && candidate.author === book.author,
+  );
+
+  if (bookIndex < 0) {
+    return null;
+  }
+
+  return `${authorCardPrefix}${bookIndex.toString(36)}`;
+}
+
+function buildBookCardKeyboard(book, keyboard = []) {
+  const authorCallbackData = buildAuthorCallbackData(book);
+
+  if (!authorCallbackData) {
+    return keyboard;
+  }
+
+  return [
+    [{ text: "👤 Об авторе", callback_data: authorCallbackData }],
+    ...keyboard,
+  ];
 }
 
 function buildRecommendationChoiceKeyboard(
@@ -462,6 +490,15 @@ function buildSearchResultsKeyboard(localResults = []) {
     .filter(Boolean);
 
   return [...bookButtons, ...buildSearchResultKeyboard()];
+}
+
+function buildAuthorInfoKeyboard() {
+  return [
+    [{ text: "📚 Найти другую книгу", callback_data: "start_find" }],
+    [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
+    [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
+    [{ text: "🏠 В меню", callback_data: menuCallbackData }],
+  ];
 }
 
 function buildCollectionsMenuKeyboard() {
@@ -603,6 +640,15 @@ function findBookByCallbackId(callbackId) {
   }
 
   return books[bookIndex] || null;
+}
+
+function buildAuthorInfoMessage(author) {
+  const encodedAuthor = encodeURIComponent(author);
+
+  return [
+    `👤 ${author}`,
+    `Можно начать отсюда:\nhttps://ru.wikipedia.org/wiki/${encodedAuthor}`,
+  ].join("\n\n");
 }
 
 async function sendStep(bot, chatId, session) {
@@ -927,6 +973,25 @@ async function handleCallbackQuery(bot, query) {
       book,
       keyboard,
     );
+    return;
+  }
+
+  if (data.startsWith(authorCardPrefix)) {
+    const book = findBookByCallbackId(data.slice(authorCardPrefix.length));
+
+    if (!book) {
+      await bot.answerCallbackQuery(query.id, {
+        text: "Не получилось открыть автора.",
+      });
+      return;
+    }
+
+    await bot.answerCallbackQuery(query.id);
+    await bot.sendMessage(chatId, buildAuthorInfoMessage(book.author), {
+      reply_markup: {
+        inline_keyboard: buildAuthorInfoKeyboard(),
+      },
+    });
     return;
   }
 
