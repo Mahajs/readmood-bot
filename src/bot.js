@@ -10,6 +10,7 @@ const {
   collections,
   findCollectionByCallbackData,
 } = require("./data/collections");
+const { findAuthorProfileByName } = require("./data/authors");
 
 const callbackPrefix = "state:";
 const moreRecommendationsPrefix = "more:";
@@ -247,6 +248,36 @@ function resolveBookCoverUrl(cover) {
   return `${baseUrl.replace(/\/+$/, "")}${cover}`;
 }
 
+function resolveAuthorPortraitUrl(portraitPath) {
+  if (!portraitPath || typeof portraitPath !== "string") {
+    return null;
+  }
+
+  if (portraitPath.startsWith("http://") || portraitPath.startsWith("https://")) {
+    return portraitPath;
+  }
+
+  if (!portraitPath.startsWith("/authors/")) {
+    return null;
+  }
+
+  const baseUrl = process.env.WEBHOOK_BASE_URL;
+
+  if (!baseUrl) {
+    return null;
+  }
+
+  return `${baseUrl.replace(/\/+$/, "")}${portraitPath}`;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function buildBookCardMessage(book, options = {}) {
   const blocks = [];
 
@@ -256,6 +287,25 @@ function buildBookCardMessage(book, options = {}) {
 
   blocks.push(`«${book.title}» — ${book.author}`);
   blocks.push(book.recommendationText || book.description);
+
+  return blocks.join("\n\n");
+}
+
+function buildAuthorCardMessage(profile) {
+  const safeName = escapeHtml(profile?.name || "");
+  const safeBio = escapeHtml(
+    profile?.bio || "Карточка автора скоро появится.",
+  );
+  const blocks = [`👤 ${safeName}`, safeBio];
+
+  if (profile?.wikiUrl) {
+    blocks.push(
+      [
+        "📚 Подробнее об авторе:",
+        `<a href="${escapeHtml(profile.wikiUrl)}">${safeName} в Википедии</a>`,
+      ].join("\n"),
+    );
+  }
 
   return blocks.join("\n\n");
 }
@@ -498,6 +548,36 @@ function buildAuthorInfoKeyboard() {
   ];
 }
 
+async function sendAuthorCard(bot, chatId, profile) {
+  const message = buildAuthorCardMessage(profile);
+  const portraitUrl = resolveAuthorPortraitUrl(profile?.portraitPath);
+  const replyMarkup = {
+    inline_keyboard: buildAuthorInfoKeyboard(),
+  };
+
+  if (portraitUrl) {
+    try {
+      await bot.sendPhoto(chatId, portraitUrl, {
+        caption: message,
+        parse_mode: "HTML",
+        reply_markup: replyMarkup,
+      });
+      return;
+    } catch (error) {
+      console.error("Author portrait send failed, falling back to text", {
+        chatId,
+        portraitUrl,
+        error: error?.message,
+      });
+    }
+  }
+
+  await bot.sendMessage(chatId, message, {
+    parse_mode: "HTML",
+    reply_markup: replyMarkup,
+  });
+}
+
 function buildCollectionsMenuKeyboard() {
   return [
     ...collections.map((collection) => [
@@ -637,144 +717,6 @@ function findBookByCallbackId(callbackId) {
   }
 
   return books[bookIndex] || null;
-}
-
-async function resolveRussianWikipediaAuthorUrl(author) {
-  const fallbackUrl = `https://ru.wikipedia.org/wiki/${encodeURIComponent(
-    String(author || "").replace(/ /g, "_"),
-  )}`;
-  const normalizeWikipediaText = (value) =>
-    String(value || "")
-      .toLowerCase()
-      .replace(/ё/g, "е")
-      .replace(/\s+/g, " ")
-      .trim();
-  const extractAuthorSurname = (value) => {
-    const parts = normalizeWikipediaText(value)
-      .split(" ")
-      .map((part) => part.replace(/\./g, "").trim())
-      .filter(Boolean)
-      .filter((part) => part.length > 1);
-
-    return parts.length ? parts[parts.length - 1] : "";
-  };
-  const scoreWikipediaResult = (title, normalizedAuthor, surname) => {
-    const normalizedTitle = normalizeWikipediaText(title);
-    let score = 0;
-
-    if (normalizedTitle === normalizedAuthor) {
-      score += 100;
-    }
-
-    if (normalizedTitle.includes(normalizedAuthor)) {
-      score += 80;
-    }
-
-    if (normalizedAuthor.includes(normalizedTitle)) {
-      score += 60;
-    }
-
-    if (!title.includes(":")) {
-      score += 20;
-    }
-
-    if (title.includes(":")) {
-      score -= 30;
-    }
-
-    if (/(биография|библиография|список|экранизац)/i.test(title)) {
-      score -= 40;
-    }
-
-    if (surname && normalizedTitle.includes(surname)) {
-      score += 30;
-    }
-
-    return score;
-  };
-
-  try {
-    const response = await fetch(
-      `https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
-        author,
-      )}&format=json&origin=*`,
-    );
-
-    if (!response.ok) {
-      throw new Error(`Wikipedia request failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    const results = Array.isArray(data?.query?.search) ? data.query.search : [];
-
-    if (!results.length) {
-      return {
-        title: author,
-        url: fallbackUrl,
-        found: false,
-      };
-    }
-
-    const normalizedAuthor = normalizeWikipediaText(author);
-    const surname = extractAuthorSurname(author);
-    const rankedResults = results
-      .map((result) => ({
-        ...result,
-        score: scoreWikipediaResult(result?.title || "", normalizedAuthor, surname),
-      }))
-      .sort((a, b) => b.score - a.score);
-    const preferredResult = rankedResults[0];
-    const title = preferredResult?.title || author;
-    const normalizedTitle = normalizeWikipediaText(title);
-    const lowConfidence =
-      !preferredResult ||
-      preferredResult.score < 50 ||
-      title.includes(":") ||
-      (surname && !normalizedTitle.includes(surname));
-
-    if (lowConfidence) {
-      return {
-        title: author,
-        url: fallbackUrl,
-        found: false,
-      };
-    }
-
-    const url = `https://ru.wikipedia.org/wiki/${encodeURIComponent(
-      title.replace(/ /g, "_"),
-    )}`;
-
-    return {
-      title,
-      url,
-      found: true,
-    };
-  } catch (error) {
-    console.warn("Wikipedia author lookup failed", {
-      author,
-      error: error?.message,
-    });
-
-    return {
-      title: author,
-      url: fallbackUrl,
-      found: false,
-    };
-  }
-}
-
-function buildAuthorInfoMessage(author, resolvedAuthor) {
-  if (resolvedAuthor.found) {
-    return [
-      `👤 ${author}`,
-      `Нашла страницу в Wikipedia:\n${resolvedAuthor.url}`,
-    ].join("\n\n");
-  }
-
-  return [
-    `👤 ${author}`,
-    `Не уверена, что нашла точную страницу, но можно начать отсюда:\n${resolvedAuthor.url}`,
-  ].join("\n\n");
 }
 
 async function sendStep(bot, chatId, session) {
@@ -1113,18 +1055,13 @@ async function handleCallbackQuery(bot, query) {
       return;
     }
 
-    const resolvedAuthor = await resolveRussianWikipediaAuthorUrl(book.author);
+    const authorProfile = findAuthorProfileByName(book.author) || {
+      name: book.author,
+      bio: "Карточка автора скоро появится.",
+    };
 
     await bot.answerCallbackQuery(query.id);
-    await bot.sendMessage(
-      chatId,
-      buildAuthorInfoMessage(book.author, resolvedAuthor),
-      {
-      reply_markup: {
-        inline_keyboard: buildAuthorInfoKeyboard(),
-      },
-      },
-    );
+    await sendAuthorCard(bot, chatId, authorProfile);
     return;
   }
 
