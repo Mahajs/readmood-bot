@@ -7,7 +7,6 @@ const requiredBookFields = [
   "length",
   "goal",
   "description",
-  "recommendationText",
   "vibe",
   "themes",
   "pace",
