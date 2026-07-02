@@ -6,17 +6,11 @@ const {
   findBooks,
   buildFindBooksMessage,
 } = require("./services/recommender");
-const {
-  collections,
-  findCollectionByCallbackData,
-} = require("./data/collections");
 const { findAuthorProfileByName } = require("./data/authors");
 
 const callbackPrefix = "state:";
 const moreRecommendationsPrefix = "more:";
 const menuCallbackData = "menu";
-const collectionsMenuCallbackData = "collections_menu";
-const backToCollectionsCallbackData = "back_to_collections";
 const backToMenuCallbackData = "back_to_menu";
 const findPromptText =
   "Напиши автора, название книги или воспользуйся командой /find.";
@@ -373,7 +367,7 @@ function buildStepKeyboard(step, session) {
 function buildStartKeyboard() {
   return [
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
-    [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
+    [{ text: "🎲 Удиви меня", callback_data: "start_random" }],
     [{ text: "ℹ️ Как это работает", callback_data: "start_help" }],
   ];
 }
@@ -510,7 +504,7 @@ function buildExhaustedRecommendationsKeyboard() {
 function buildHelpKeyboard() {
   return [
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
-    [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
+    [{ text: "🎲 Удиви меня", callback_data: "start_random" }],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
   ];
 }
@@ -519,7 +513,7 @@ function buildSearchResultKeyboard() {
   return [
     [{ text: "📚 Найти другую книгу", callback_data: "start_find" }],
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
-    [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
+    [{ text: "🎲 Удиви меня", callback_data: "start_random" }],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
   ];
 }
@@ -543,7 +537,7 @@ function buildSearchResultsKeyboard(localResults = []) {
 function buildAuthorInfoKeyboard() {
   return [
     [{ text: "📖 Что почитать?", callback_data: "start_pick" }],
-    [{ text: "✨ Подборки", callback_data: collectionsMenuCallbackData }],
+    [{ text: "🎲 Удиви меня", callback_data: "start_random" }],
     [{ text: "🏠 В меню", callback_data: menuCallbackData }],
   ];
 }
@@ -575,68 +569,6 @@ async function sendAuthorCard(bot, chatId, profile) {
   await bot.sendMessage(chatId, message, {
     parse_mode: "HTML",
     reply_markup: replyMarkup,
-  });
-}
-
-function buildCollectionsMenuKeyboard() {
-  return [
-    ...collections.map((collection) => [
-      {
-        text: collection.buttonLabel || collection.title,
-        callback_data: collection.callbackData,
-      },
-    ]),
-    [{ text: "🏠 В меню", callback_data: backToMenuCallbackData }],
-  ];
-}
-
-function buildCollectionKeyboard() {
-  return [
-    [{ text: "← К подборкам", callback_data: backToCollectionsCallbackData }],
-    [{ text: "🏠 В меню", callback_data: backToMenuCallbackData }],
-  ];
-}
-
-function buildCollectionMessage(collection) {
-  const blocks = [
-    collection.title,
-    collection.intro,
-    collection.books.map((book) => `• ${book}`).join("\n"),
-  ];
-
-  if (collection.startHere?.length) {
-    blocks.push(
-      [
-        "С чего начать:",
-        collection.startHere.map((item) => `• ${item}`).join("\n"),
-      ].join("\n"),
-    );
-  }
-
-  return blocks.join("\n\n");
-}
-
-async function sendCollectionsMenu(bot, chatId) {
-  await bot.sendMessage(
-    chatId,
-    [
-      "✨ Авторские подборки",
-      "Личные книжные маршруты: по теме, жанру или читательскому настроению.",
-      "Выбери подборку — покажу список.",
-    ].join("\n\n"),
-    {
-      reply_markup: {
-        inline_keyboard: buildCollectionsMenuKeyboard(),
-      },
-    },
-  );
-}
-
-async function sendCollection(bot, chatId, collection) {
-  await bot.sendMessage(chatId, buildCollectionMessage(collection), {
-    reply_markup: {
-      inline_keyboard: buildCollectionKeyboard(),
-    },
   });
 }
 
@@ -757,7 +689,7 @@ async function handleStart(bot, chatId) {
     [
       "Привет. Я ReadMoodBot.",
       "Помогаю подобрать книгу под твое состояние: настроение, жанр, атмосферу и темп.",
-      "Можно пройти короткий опрос, открыть авторские подборки или выбрать книгу из готовых карточек.",
+      "Можно пройти короткий опрос, сразу получить случайную книгу или открыть карточку автора у понравившейся книги.",
     ].join("\n\n"),
     {
       reply_markup: {
@@ -809,7 +741,7 @@ async function handleFind(bot, chatId, text) {
     console.error("Search flow failed", { chatId, query, error: error?.message });
     await bot.sendMessage(
       chatId,
-      "Не смогла выполнить поиск. Попробуй еще раз чуть позже или введи другой запрос.",
+      "Не смог выполнить поиск. Попробуй еще раз чуть позже или введи другой запрос.",
       {
         reply_markup: {
           inline_keyboard: buildSearchResultKeyboard(),
@@ -841,7 +773,7 @@ async function handleFindQuery(bot, chatId, query) {
     });
     await bot.sendMessage(
       chatId,
-      "Не смогла выполнить поиск. Попробуй еще раз чуть позже или введи другой запрос.",
+      "Не смог выполнить поиск. Попробуй еще раз чуть позже или введи другой запрос.",
       {
         reply_markup: {
           inline_keyboard: buildSearchResultKeyboard(),
@@ -858,10 +790,10 @@ async function handleHelp(bot, chatId) {
     [
       "Что я умею",
       "📖 Подобрать книгу — если хочется найти чтение под настроение, атмосферу и темп.",
-      "✨ Авторские подборки — если хочется выбирать не по настроению, а по теме, жанру или читательскому интересу.",
-      "🎲 Случайная книга — если хочется неожиданного, но все еще curated-варианта.",
+      "🎲 Удиви меня — если хочется случайной, но все еще продуманно выбранной книги из базы.",
+      "📚 Найти книгу — если ты уже знаешь автора или название и хочешь воспользоваться /find.",
       "👤 Карточки книг и кнопка «Об авторе» — чтобы быстро перейти от рекомендации к самой книге и дальше к контексту автора.",
-      "После рекомендаций можно нажать «Еще варианты» — я покажу другую тройку без нового опроса.",
+      "После рекомендаций можно нажать «Еще варианты», а в случайном режиме — взять еще одну книгу без нового опроса.",
       "Если не знаешь, с чего начать, нажми «Что почитать?».",
     ].join("\n\n"),
     {
@@ -915,7 +847,7 @@ async function handleMessage(bot, message) {
   if (!command) {
     await bot.sendMessage(
       chatId,
-      "Я пока понимаю команды и кнопки. Чтобы найти книгу, нажми «📚 Найти книгу» или используй /find название.",
+      "Я пока понимаю команды и кнопки. Если хочешь найти конкретную книгу, используй /find и добавь автора или название.",
       {
         reply_markup: {
           inline_keyboard: buildSearchResultKeyboard(),
@@ -944,6 +876,15 @@ async function handleCallbackQuery(bot, query) {
     return;
   }
 
+  if (data === "start_random") {
+    await bot.answerCallbackQuery(query.id);
+    await sendRecommendations(bot, chatId, {
+      ...createEmptySession(),
+      goal: "ra",
+    });
+    return;
+  }
+
   if (data === "start_find") {
     await bot.answerCallbackQuery(query.id);
     await bot.sendMessage(chatId, findPromptText, {
@@ -955,19 +896,13 @@ async function handleCallbackQuery(bot, query) {
     return;
   }
 
-  if (data === "start_collections" || data === collectionsMenuCallbackData) {
-    await bot.answerCallbackQuery(query.id);
-    await sendCollectionsMenu(bot, chatId);
-    return;
-  }
-
   if (data === "start_help") {
     await bot.answerCallbackQuery(query.id);
     await bot.sendMessage(
       chatId,
       [
         "Как это работает",
-        "Я могу подобрать книгу через короткий опрос, показать авторские подборки и дать карточки книг с переходом к автору.",
+        "Я могу подобрать книгу через короткий опрос, сразу предложить случайную книгу и показать карточку автора у понравившейся книги.",
         "Подбор строится не только по жанру: я смотрю на атмосферу, темп и то, чего тебе сейчас хочется от чтения.",
       ].join("\n\n"),
       {
@@ -979,23 +914,22 @@ async function handleCallbackQuery(bot, query) {
     return;
   }
 
-  if (data === menuCallbackData || data === backToMenuCallbackData) {
-    await bot.answerCallbackQuery(query.id);
+  if (
+    data === "start_collections" ||
+    data === "collections_menu" ||
+    data === "back_to_collections" ||
+    data.startsWith("collection_")
+  ) {
+    await bot.answerCallbackQuery(query.id, {
+      text: "Подборки больше не в главном меню. Открываю стартовый экран.",
+    });
     await handleStart(bot, chatId);
     return;
   }
 
-  if (data === backToCollectionsCallbackData) {
+  if (data === menuCallbackData || data === backToMenuCallbackData) {
     await bot.answerCallbackQuery(query.id);
-    await sendCollectionsMenu(bot, chatId);
-    return;
-  }
-
-  const collection = findCollectionByCallbackData(data);
-
-  if (collection) {
-    await bot.answerCallbackQuery(query.id);
-    await sendCollection(bot, chatId, collection);
+    await handleStart(bot, chatId);
     return;
   }
 
