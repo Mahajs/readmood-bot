@@ -242,6 +242,28 @@ function resolveBookCoverUrl(cover) {
   return `${baseUrl.replace(/\/+$/, "")}${cover}`;
 }
 
+function resolveWelcomeImageUrl(imagePath) {
+  if (!imagePath || typeof imagePath !== "string") {
+    return null;
+  }
+
+  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+    return imagePath;
+  }
+
+  if (!imagePath.startsWith("/images/")) {
+    return null;
+  }
+
+  const baseUrl = process.env.WEBHOOK_BASE_URL;
+
+  if (!baseUrl) {
+    return null;
+  }
+
+  return `${baseUrl.replace(/\/+$/, "")}${imagePath}`;
+}
+
 function resolveAuthorPortraitUrl(portraitPath) {
   if (!portraitPath || typeof portraitPath !== "string") {
     return null;
@@ -370,6 +392,14 @@ function buildStartKeyboard() {
     [{ text: "🎲 Удиви меня", callback_data: "start_random" }],
     [{ text: "ℹ️ Как это работает", callback_data: "start_help" }],
   ];
+}
+
+function buildStartMessage() {
+  return [
+    "Привет. Я ReadMoodBot.",
+    "Помогаю подобрать книгу под твое состояние: настроение, жанр, атмосферу и темп.",
+    "Можно пройти короткий опрос, сразу получить случайную книгу или открыть карточку автора у понравившейся книги.",
+  ].join("\n\n");
 }
 
 function buildRecommendationsKeyboard(session, recommendationState) {
@@ -684,19 +714,26 @@ function extractCommandArgument(text) {
 
 async function handleStart(bot, chatId) {
   console.log("Handling /start", { chatId });
-  await bot.sendMessage(
-    chatId,
-    [
-      "Привет. Я ReadMoodBot.",
-      "Помогаю подобрать книгу под твое состояние: настроение, жанр, атмосферу и темп.",
-      "Можно пройти короткий опрос, сразу получить случайную книгу или открыть карточку автора у понравившейся книги.",
-    ].join("\n\n"),
-    {
-      reply_markup: {
-        inline_keyboard: buildStartKeyboard(),
-      },
+  const message = buildStartMessage();
+  const welcomeImageUrl = resolveWelcomeImageUrl("/images/welcome-collage.png");
+
+  if (welcomeImageUrl) {
+    try {
+      await bot.sendPhoto(chatId, welcomeImageUrl);
+    } catch (error) {
+      console.warn("Welcome collage send failed, continuing with text", {
+        chatId,
+        welcomeImageUrl,
+        error: error?.message,
+      });
+    }
+  }
+
+  await bot.sendMessage(chatId, message, {
+    reply_markup: {
+      inline_keyboard: buildStartKeyboard(),
     },
-  );
+  });
 }
 
 async function handleRestart(bot, chatId) {
