@@ -635,7 +635,7 @@ async function sendRecommendations(bot, chatId, session, currentRecommendationSt
 
     if (randomBook) {
       message = [
-        "🎲 Сегодня я бы предложил тебе:",
+        "🎲 Сегодня я бы предложила тебе:",
         `«${randomBook.title}» — ${randomBook.author}`,
         randomBook.recommendationText || randomBook.description,
       ].join("\n\n");
@@ -648,7 +648,7 @@ async function sendRecommendations(bot, chatId, session, currentRecommendationSt
 
     if (randomBook) {
       await sendBookCard(bot, chatId, randomBook, keyboard, {
-        lead: "🎲 Сегодня я бы предложил тебе:",
+        lead: "🎲 Сегодня я бы предложила тебе:",
       });
       return;
     }
@@ -716,12 +716,19 @@ async function handleStart(bot, chatId) {
   console.log("Handling /start", { chatId });
   const message = buildStartMessage();
   const welcomeImageUrl = resolveWelcomeImageUrl("/images/welcome-collage.png");
+  const replyMarkup = {
+    inline_keyboard: buildStartKeyboard(),
+  };
 
   if (welcomeImageUrl) {
     try {
-      await bot.sendPhoto(chatId, welcomeImageUrl);
+      await bot.sendPhoto(chatId, welcomeImageUrl, {
+        caption: message,
+        reply_markup: replyMarkup,
+      });
+      return;
     } catch (error) {
-      console.warn("Welcome collage send failed, continuing with text", {
+      console.warn("Welcome collage send failed, falling back to text", {
         chatId,
         welcomeImageUrl,
         error: error?.message,
@@ -730,9 +737,7 @@ async function handleStart(bot, chatId) {
   }
 
   await bot.sendMessage(chatId, message, {
-    reply_markup: {
-      inline_keyboard: buildStartKeyboard(),
-    },
+    reply_markup: replyMarkup,
   });
 }
 
@@ -778,7 +783,7 @@ async function handleFind(bot, chatId, text) {
     console.error("Search flow failed", { chatId, query, error: error?.message });
     await bot.sendMessage(
       chatId,
-      "Не смог выполнить поиск. Попробуй еще раз чуть позже или введи другой запрос.",
+      "Не смогла выполнить поиск. Попробуй еще раз чуть позже или введи другой запрос.",
       {
         reply_markup: {
           inline_keyboard: buildSearchResultKeyboard(),
@@ -810,7 +815,7 @@ async function handleFindQuery(bot, chatId, query) {
     });
     await bot.sendMessage(
       chatId,
-      "Не смог выполнить поиск. Попробуй еще раз чуть позже или введи другой запрос.",
+      "Не смогла выполнить поиск. Попробуй еще раз чуть позже или введи другой запрос.",
       {
         reply_markup: {
           inline_keyboard: buildSearchResultKeyboard(),

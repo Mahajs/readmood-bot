@@ -894,17 +894,17 @@ function buildRecommendationMessage(preferences, recommendationSet) {
   if (recommendationSet.exhausted) {
     if (recommendationSet.exhaustedKind === "random") {
       return [
-        "Кажется, я уже перебрал все случайные варианты на этот заход.",
+        "Кажется, я уже перебрала все случайные варианты на этот заход.",
         "Можно начать заново — тогда перемешаю книги по-новому."
       ].join("\n\n");
     }
 
-    return "Похоже, я уже показал все подходящие варианты по этому запросу. Можно подобрать заново или вернуться в меню.";
+    return "Похоже, я уже показала все подходящие варианты по этому запросу. Можно подобрать заново или вернуться в меню.";
   }
 
   if (recommendationSet.roleRecommendations) {
     const { exact, safe, stretch } = recommendationSet.roleRecommendations;
-    const blocks = [["Вот что я бы предложил:"]];
+    const blocks = [["Вот что я бы предложила:"]];
 
     if (exact) {
       blocks.push([
@@ -943,7 +943,7 @@ function buildRecommendationMessage(preferences, recommendationSet) {
   }
 
   const summary = [
-    "Вот что я бы порекомендовал:",
+    "Вот что я бы порекомендовала:",
     `Жанр: ${preferences.genre || "любой"}`,
     `Настроение: ${preferences.mood || "любое"}`,
     `Формат: ${preferences.format || "любой"}`,

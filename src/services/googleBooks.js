@@ -207,7 +207,7 @@ async function searchGoogleBooks(preferences, options = {}) {
   });
 
   return (data.items || []).map((item) =>
-    mapGoogleBook(item, "Нашел во внешней базе Google Books по твоим параметрам.")
+    mapGoogleBook(item, "Нашла во внешней базе Google Books по твоим параметрам.")
   );
 }
 
