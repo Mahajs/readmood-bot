@@ -11,6 +11,8 @@ const { findAuthorProfileByName } = require("./data/authors");
 const callbackPrefix = "state:";
 const moreRecommendationsPrefix = "more:";
 const menuCallbackData = "menu";
+// Ни одна клавиатура его больше не отправляет, но кнопки с ним живут в старых
+// сообщениях у пользователей. Обработчик держим ради обратной совместимости.
 const backToMenuCallbackData = "back_to_menu";
 const findPromptText =
   "Напиши автора, название книги или воспользуйся командой /find.";
@@ -956,6 +958,8 @@ async function handleCallbackQuery(bot, query) {
     return;
   }
 
+  // Подборки убраны из меню, но кнопки остались в старых сообщениях у
+  // пользователей — Telegram шлёт их бесконечно. Не удалять.
   if (
     data === "start_collections" ||
     data === "collections_menu" ||

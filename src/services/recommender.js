@@ -100,7 +100,6 @@ function allowsHeavySafeThemes(preferences) {
   );
 }
 
-const defaultTopLimit = 4;
 const recommendationRoles = ["exact", "safe", "stretch"];
 
 const structuredGenreProfiles = {
@@ -121,12 +120,11 @@ const structuredGenreProfiles = {
       "Скотный двор",
       "451 градус по Фаренгейту",
       "Три товарища",
-      "Над пропастью во ржи",
       "Исповедь неполноценного человека",
       "Закатное солнце",
       "Кокоро",
       "Ваш покорный слуга кот",
-      "Рассёмон",
+      "Ворота Рассёмон",
       "В чаще",
       "Тысячекрылый журавль",
       "Стон горы",
@@ -138,7 +136,6 @@ const structuredGenreProfiles = {
       "Джордж Оруэлл",
       "Рэй Брэдбери",
       "Эрих Мария Ремарк",
-      "Джером Д. Сэлинджер",
       "Осаму Дадзай",
       "Кобо Абэ",
       "Юкио Мисима",
@@ -157,7 +154,7 @@ const structuredGenreProfiles = {
       "Цугуми",
       "Человек-комбини",
       "Земляноиды",
-      "Чудеса универсама «Намиа»",
+      "Магазин чудес \"Намия\"",
       "Кафка на пляже",
       "Норвежский лес",
       "1Q84"
@@ -452,32 +449,6 @@ function hasDifferentTasteVector(book, exactBook, preferences) {
   }
 
   return differentGenre || differentVibe;
-}
-
-function pickFirstUnique(candidates, usedIds) {
-  return candidates.find((book) => {
-    const id = createBookIdentity(book.title, book.author);
-    return !usedIds.has(id);
-  });
-}
-
-function pickRandomFromTop(candidates, usedIds, topLimit = randomTopLimit) {
-  const availableCandidates = candidates.filter((book) => {
-    const id = createBookIdentity(book.title, book.author);
-    return !usedIds.has(id);
-  });
-  const topCandidates = availableCandidates.slice(0, topLimit);
-
-  if (!topCandidates.length) {
-    return null;
-  }
-
-  const randomIndex = Math.floor(Math.random() * topCandidates.length);
-  return topCandidates[randomIndex];
-}
-
-function pickRankedUnique(candidates, usedIds, topLimit = defaultTopLimit) {
-  return pickRandomFromTop(candidates, usedIds, topLimit);
 }
 
 function createSelectionIndex(seed, page, salt, length) {
@@ -1050,5 +1021,6 @@ module.exports = {
   recommendBooks,
   recommendLocalBooks,
   buildRecommendationMessage,
-  buildFindBooksMessage
+  buildFindBooksMessage,
+  structuredGenreProfiles
 };

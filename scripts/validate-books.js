@@ -8,6 +8,9 @@ const {
   allowedBookPaces,
   allowedBookComplexities,
 } = require(path.join(__dirname, "../src/data/bookSchema"));
+const {
+  structuredGenreProfiles,
+} = require(path.join(__dirname, "../src/services/recommender"));
 
 const allowedGenres = new Set(allowedBookGenres);
 const allowedPaces = new Set(allowedBookPaces);
@@ -187,6 +190,38 @@ function findDuplicates(bookList, errorsByBook) {
   });
 }
 
+const profileTitleFields = ["exactTitles", "adjacentTitles", "stretchTitles"];
+
+// structuredGenreProfiles матчит книги по названию и автору, поэтому любое
+// переименование в books.js молча выключает правило. Ловим такие ссылки здесь.
+function validateGenreProfiles(bookList) {
+  const knownTitles = new Set(bookList.map((book) => normalizeText(book.title)));
+  const knownAuthors = new Set(bookList.map((book) => normalizeText(book.author)));
+  const generalErrors = [];
+
+  for (const [genre, profile] of Object.entries(structuredGenreProfiles || {})) {
+    for (const field of profileTitleFields) {
+      for (const title of profile[field] || []) {
+        if (!knownTitles.has(normalizeText(title))) {
+          generalErrors.push(
+            `structuredGenreProfiles.${genre}.${field}: книги "${title}" нет в books.js`,
+          );
+        }
+      }
+    }
+
+    for (const author of profile.exactAuthors || []) {
+      if (!knownAuthors.has(normalizeText(author))) {
+        generalErrors.push(
+          `structuredGenreProfiles.${genre}.exactAuthors: автора "${author}" нет в books.js`,
+        );
+      }
+    }
+  }
+
+  return generalErrors;
+}
+
 function validateBooks(bookList) {
   const errorsByBook = new Map();
 
@@ -212,7 +247,7 @@ function validateBooks(bookList) {
 
   findDuplicates(bookList, errorsByBook);
 
-  return { errorsByBook };
+  return { errorsByBook, generalErrors: validateGenreProfiles(bookList) };
 }
 
 function printValidationResult(bookList, result) {
@@ -221,12 +256,22 @@ function printValidationResult(bookList, result) {
     return;
   }
 
-  if (result.errorsByBook.size === 0) {
+  const generalErrors = result.generalErrors || [];
+
+  if (result.errorsByBook.size === 0 && generalErrors.length === 0) {
     console.log(`✅ books.js валиден. Проверено книг: ${bookList.length}.`);
     return;
   }
 
   console.error(`❌ books.js содержит ошибки. Проверено книг: ${bookList.length}.`);
+
+  if (generalErrors.length) {
+    console.error("\n❌ Правила подбора ссылаются на несуществующие книги");
+
+    for (const message of generalErrors) {
+      console.error(`* ${message}`);
+    }
+  }
 
   for (const [index, messages] of result.errorsByBook.entries()) {
     console.error(`\n❌ ${formatBookLabel(bookList[index], index)}`);
@@ -240,6 +285,10 @@ function printValidationResult(bookList, result) {
 const result = validateBooks(books);
 printValidationResult(books, result);
 
-if (result.fatalError || result.errorsByBook.size > 0) {
+if (
+  result.fatalError ||
+  result.errorsByBook.size > 0 ||
+  (result.generalErrors || []).length > 0
+) {
   process.exitCode = 1;
 }
