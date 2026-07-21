@@ -16,7 +16,7 @@ function normalizeText(value) {
 const goalToLegacyGoalsMap = {
   relax: ["отдохнуть"],
   inspire: ["вдохновиться"],
-  emotional: ["подумать", "вдохновиться"],
+  emotional: ["попереживать"],
   reflective: ["подумать", "узнать новое"],
   escape: ["погрузиться в мир"],
   dynamic: ["отдохнуть", "погрузиться в мир"]
@@ -66,9 +66,15 @@ const lengthToLegacyLengthMap = {
 const paceToLegacyMoodMap = {
   slow: ["вдумчивое", "эмоциональное"],
   medium: ["легкое", "вдумчивое", "практичное"],
-  fast: ["приключенческое", "легкое"],
-  very_fast: ["приключенческое"]
+  fast: ["приключенческое", "легкое"]
 };
+
+// Отдельной категории "very_fast" больше нет — она слита с "fast". Значение
+// всё ещё встречается в books.js и в старых callback_data, поэтому приводим его
+// здесь, а не правим данные.
+function normalizePace(pace) {
+  return pace === "very_fast" ? "fast" : pace;
+}
 
 const heavySafeThemes = [
   "саморазрушение",
@@ -342,7 +348,7 @@ function scoreBook(book, preferences) {
   if (
     preferences.pace &&
     preferences.pace !== "any" &&
-    book.pace === preferences.pace
+    normalizePace(book.pace) === normalizePace(preferences.pace)
   ) {
     score += 2;
   }
@@ -350,7 +356,7 @@ function scoreBook(book, preferences) {
   if (
     preferences.pace &&
     preferences.pace !== "any" &&
-    includesAny(book.mood, paceToLegacyMoodMap[preferences.pace])
+    includesAny(book.mood, paceToLegacyMoodMap[normalizePace(preferences.pace)])
   ) {
     score += 1;
   }
@@ -358,8 +364,35 @@ function scoreBook(book, preferences) {
   return score;
 }
 
+// Русские значения — наследие старого формата данных, схема их уже не
+// пропускает, но остальной файл их всё ещё учитывает (см. isSlowPaced).
+const complexityRanks = {
+  low: 0,
+  "простая": 0,
+  medium: 1,
+  "средняя": 1,
+  high: 2,
+  "сложная": 2
+};
+
+function getComplexityRank(book) {
+  const rank = complexityRanks[book && book.complexity];
+  return typeof rank === "number" ? rank : complexityRanks.medium;
+}
+
 function isHighComplexity(book) {
-  return book.complexity === "high" || book.complexity === "сложная";
+  return getComplexityRank(book) === complexityRanks.high;
+}
+
+// Карточка подписана «Более легкий вариант», поэтому safe не должен быть
+// сложнее exact. Если такого кандидата нет вовсе, ограничение снимается —
+// показать вариант важнее, чем оставить пользователя с одной книгой.
+function isNotHarderThan(book, exact) {
+  if (!exact) {
+    return true;
+  }
+
+  return getComplexityRank(book) <= getComplexityRank(exact);
 }
 
 function isSlowPaced(book) {
@@ -421,7 +454,7 @@ function getSafeScore(book, preferences) {
     safeScore += 1;
   }
 
-  if (book.pace === "fast") {
+  if (normalizePace(book.pace) === "fast") {
     safeScore += 1;
   }
 
@@ -618,11 +651,12 @@ function buildRoleRecommendations(preferences, options = {}) {
       pageUsedIds.add(createBookIdentity(exact.title, exact.author));
     }
 
-    const safe =
+    const selectSafe = (allows) =>
       pickSeededUnique(
         sortSafeCandidates(
           genreSafeCandidates.filter(
-            (book) => book.score >= 3 && isSafeBook(book, preferences)
+            (book) =>
+              book.score >= 3 && isSafeBook(book, preferences) && allows(book)
           ),
           preferences
         ),
@@ -634,7 +668,9 @@ function buildRoleRecommendations(preferences, options = {}) {
       ) ||
       pickSeededUnique(
         sortSafeCandidates(
-          genreSafeCandidates.filter((book) => isSafeBook(book, preferences)),
+          genreSafeCandidates.filter(
+            (book) => isSafeBook(book, preferences) && allows(book)
+          ),
           preferences
         ),
         pageUsedIds,
@@ -647,7 +683,9 @@ function buildRoleRecommendations(preferences, options = {}) {
         sortSafeCandidates(
           scoredBooks.filter(
             (book) =>
-              isSafeBook(book, preferences) && isGenreCompatible(book, preferences)
+              isSafeBook(book, preferences) &&
+              isGenreCompatible(book, preferences) &&
+              allows(book)
           ),
           preferences
         ),
@@ -658,6 +696,10 @@ function buildRoleRecommendations(preferences, options = {}) {
         4
       ) ||
       null;
+
+    const safe =
+      selectSafe((book) => isNotHarderThan(book, exact)) ||
+      selectSafe(() => true);
 
     if (safe) {
       pageUsedIds.add(createBookIdentity(safe.title, safe.author));
@@ -1022,5 +1064,6 @@ module.exports = {
   recommendLocalBooks,
   buildRecommendationMessage,
   buildFindBooksMessage,
-  structuredGenreProfiles
+  structuredGenreProfiles,
+  goalToLegacyGoalsMap
 };

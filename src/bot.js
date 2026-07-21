@@ -55,7 +55,10 @@ const optionCatalog = {
     sl: { label: "Медленный", value: "slow" },
     md: { label: "Средний", value: "medium" },
     fs: { label: "Динамичный", value: "fast" },
-    vf: { label: "Стремительный", value: "very_fast" },
+    // Кнопки больше нет: "Стремительный" стоял на одной книге каталога и слит с
+    // "Динамичным". Код остаётся, чтобы старые сообщения с vf в callback_data
+    // продолжали открываться — теперь они читаются как "Динамичный".
+    vf: { label: "Динамичный", value: "fast" },
     an: { label: "Не важно", value: "any" },
   },
   length: {
@@ -93,7 +96,7 @@ const steps = [
   {
     key: "pace",
     question: "Какой темп сюжета тебе нужен?",
-    rows: [["sl", "md"], ["fs", "vf"], ["an"]],
+    rows: [["sl", "md"], ["fs", "an"]],
   },
   {
     key: "length",

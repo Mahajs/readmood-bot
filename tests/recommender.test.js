@@ -5,6 +5,7 @@ const {
   recommendBooks,
   findLocalBooks,
   buildRecommendationMessage,
+  goalToLegacyGoalsMap,
 } = require("../src/services/recommender");
 const { books } = require("../src/data/books");
 
@@ -27,7 +28,8 @@ const genres = [
   "classic",
   "any",
 ];
-const paces = ["slow", "medium", "fast", "very_fast", "any"];
+// "very_fast" больше не отдельный вариант ответа — он слит с "fast".
+const paces = ["slow", "medium", "fast", "any"];
 const lengths = ["short", "medium", "long", "any"];
 
 function everyCombination() {
@@ -74,7 +76,7 @@ test("любое сочетание ответов даёт рекомендац
   }
 
   assert.deepEqual(failures.slice(0, 5), []);
-  assert.equal(combinations.length, 5760);
+  assert.equal(combinations.length, 4608);
 });
 
 test("выбранный жанр всегда соблюдается в «точном попадании»", async () => {
@@ -226,4 +228,165 @@ test("карточка книги не остаётся без текста", as
 
   assert.ok(message.length > 0);
   assert.doesNotMatch(message, /undefined/);
+});
+
+// --- Первая итерация улучшений подбора ---
+
+// Кнопка «Попереживать» раньше искала книги с целями «подумать» и
+// «вдохновиться», хотя в каталоге есть отдельное значение «попереживать».
+// Проверяем сам маппинг: доля попаданий зависит от состава каталога, а правило —
+// нет.
+test("цель «Попереживать» ищет книги с целью «попереживать»", () => {
+  assert.deepEqual(goalToLegacyGoalsMap.emotional, ["попереживать"]);
+});
+
+// Ровно та ошибка, которая была: цель указывает на значение, которого нет ни у
+// одной книги, и вариант ответа тихо перестаёт работать.
+test("каждая цель опроса указывает на значения, которые есть в каталоге", () => {
+  const knownGoals = new Set(books.flatMap((book) => book.goal || []));
+
+  for (const [goal, legacyGoals] of Object.entries(goalToLegacyGoalsMap)) {
+    assert.ok(legacyGoals.length > 0, `цель "${goal}" ни на что не указывает`);
+
+    for (const legacyGoal of legacyGoals) {
+      assert.ok(
+        knownGoals.has(legacyGoal),
+        `цель "${goal}" ищет "${legacyGoal}", но такого значения нет ни у одной книги`,
+      );
+    }
+  }
+});
+
+test("каждый вариант цели остаётся рабочим", async () => {
+  for (const goal of goals) {
+    const result = await recommendBooks(
+      { goal, vibe: "any", genre: "any", pace: "any", length: "any" },
+      { chainSeed: 1, chainPage: 0, skipExternal: true },
+    );
+
+    assert.ok(
+      result.roleRecommendations && result.roleRecommendations.exact,
+      `цель "${goal}" не вернула рекомендацию`,
+    );
+  }
+});
+
+const complexityRanks = { low: 0, medium: 1, high: 2 };
+
+// Собирает книги, которые алгоритм сам показывает как safe для этих же ответов.
+// Пригодность книги в роли safe от страницы не зависит, меняются только seed и
+// список уже показанного, поэтому любая такая книга была доступна и на первой
+// странице. Это даёт список кандидатов, не дублируя внутренние правила отбора.
+async function collectSafeCandidates(preferences, pages = 6) {
+  const candidates = new Map();
+
+  for (let page = 0; page < pages; page++) {
+    const result = await recommendBooks(preferences, {
+      chainSeed: 1,
+      chainPage: page,
+      skipExternal: true,
+    });
+    const safe = result.roleRecommendations && result.roleRecommendations.safe;
+
+    if (safe) {
+      candidates.set(safe.title, safe);
+    }
+  }
+
+  return [...candidates.values()];
+}
+
+// Карточка подписана «Более легкий вариант», поэтому safe не должен быть сложнее
+// exact. Ограничение снимается только там, где подходящего кандидата нет вовсе —
+// и именно это здесь проверяется, без опоры на конкретный жанр или книгу.
+test("если есть кандидат не сложнее exact, safe обязан его выбрать", async () => {
+  const avoidable = [];
+
+  for (const preferences of everyCombination()) {
+    const result = await recommendBooks(preferences, {
+      chainSeed: 1,
+      chainPage: 0,
+      skipExternal: true,
+    });
+    const { exact, safe } = result.roleRecommendations || {};
+
+    if (!exact || !safe) {
+      continue;
+    }
+
+    if (complexityRanks[safe.complexity] <= complexityRanks[exact.complexity]) {
+      continue;
+    }
+
+    const witness = (await collectSafeCandidates(preferences)).find(
+      (book) =>
+        book.title !== exact.title &&
+        complexityRanks[book.complexity] <= complexityRanks[exact.complexity],
+    );
+
+    if (witness) {
+      avoidable.push({
+        preferences,
+        exact: `${exact.title} (${exact.complexity})`,
+        safe: `${safe.title} (${safe.complexity})`,
+        witness: `${witness.title} (${witness.complexity})`,
+      });
+    }
+  }
+
+  assert.deepEqual(
+    avoidable.slice(0, 3),
+    [],
+    "safe оказался сложнее exact, хотя более лёгкий кандидат существовал",
+  );
+});
+
+// very_fast слит с fast: отдельной категории больше нет, но единственная книга
+// с таким темпом обязана остаться достижимой.
+test("very_fast слит с fast и книга не потеряна", async () => {
+  const veryFast = books.filter((book) => book.pace === "very_fast");
+
+  if (veryFast.length === 0) {
+    return;
+  }
+
+  const reachable = new Set();
+
+  for (const goal of goals) {
+    for (const vibe of vibes) {
+      for (let page = 0; page < 4; page++) {
+        const result = await recommendBooks(
+          { goal, vibe, genre: "any", pace: "fast", length: "any" },
+          { chainSeed: 1, chainPage: page, skipExternal: true },
+        );
+        const roles = result.roleRecommendations || {};
+
+        for (const role of ["exact", "safe", "stretch"]) {
+          if (roles[role]) {
+            reachable.add(roles[role].title);
+          }
+        }
+      }
+    }
+  }
+
+  for (const book of veryFast) {
+    assert.ok(
+      reachable.has(book.title),
+      `«${book.title}» с pace=very_fast не выдаётся по запросу «Динамичный»`,
+    );
+  }
+});
+
+test("ответ pace=very_fast обрабатывается как fast", async () => {
+  const options = { chainSeed: 3, chainPage: 0, skipExternal: true };
+  const base = { goal: "dynamic", vibe: "any", genre: "any", length: "any" };
+
+  const asFast = await recommendBooks({ ...base, pace: "fast" }, options);
+  const asVeryFast = await recommendBooks({ ...base, pace: "very_fast" }, options);
+
+  assert.equal(
+    asVeryFast.roleRecommendations.exact.title,
+    asFast.roleRecommendations.exact.title,
+  );
 });

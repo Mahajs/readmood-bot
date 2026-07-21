@@ -94,9 +94,9 @@ Author profiles live separately in [src/data/authors.js](src/data/authors.js) (n
 
 Current state:
 
-- 102 validated books
+- 98 validated books
 - 75 author profiles
-- 75 of 102 books have a cover image; the rest render as text-only cards
+- all 98 books have a cover image
 - no author has a `portraitPath` yet, so author cards are text-only; the
   `sendPhoto` path in [src/bot.js](src/bot.js) stays dormant until
   `public/authors/` exists
@@ -149,7 +149,7 @@ npm run check
 ```
 
 The tests cover the catalog schema, cover and portrait files actually existing on
-disk, all 5760 survey answer combinations returning a recommendation, chain
+disk, all 4608 survey answer combinations returning a recommendation, chain
 de-duplication, seed determinism, and the genre rules staying in sync with
 `books.js`.
 CI runs on every push and pull request via
@@ -214,7 +214,6 @@ The webhook endpoint is:
 - add explicit `randomEligible` support instead of keeping random participation only in code
 - fill in `vibe` tags for the whole catalog — atmosphere is the second survey question but the weakest matching signal today
 - rebalance scoring weights: genre currently outweighs atmosphere, goal, pace, and length combined
-- add covers for the remaining 27 books
 - add author portraits under `public/authors/` and fill in `portraitPath`
 - covers are named `.jpg` but many files are actually WebP or PNG; worth
   normalising the extensions so the served content type matches
