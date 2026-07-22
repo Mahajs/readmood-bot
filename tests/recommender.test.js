@@ -390,3 +390,150 @@ test("ответ pace=very_fast обрабатывается как fast", async
     asFast.roleRecommendations.exact.title,
   );
 });
+
+// --- Покрытие поджанров внутри жанров «Детектив» и «Классика» ---
+//
+// Жанры detective/classic сопоставляются не по полю книги, а по спискам в
+// structuredGenreProfiles. Раньше списки были неполными: «Детектив» находил
+// только классическую головоломку (по теме «детектив»), а весь нуар,
+// скандинавский криминал и мистические новеллы Рампо были недостижимы, хотя
+// это самый крупный тематический пласт каталога. «Классика» пропускала всю
+// русскую классику. Эти тесты фиксируют, что перечисленные книги снова
+// достижимы через свой жанр. Достижимость проверяется через сам алгоритм
+// (роли exact/safe/stretch по разным vibe/seed), а не через внутренние правила.
+
+// Перебирает все ответы vibe/pace/length (то, что реально может выбрать
+// пользователь) и несколько seed/page, собирая все книги, которые алгоритм сам
+// выдаёт в ролях exact/safe/stretch для этого жанра. Length меняется намеренно:
+// тяжёлая классика высокой сложности проходит только в роли exact и выигрывает
+// её лишь при подходящем ответе о длине — как и у реального пользователя.
+async function reachableTitlesForGenre(genre, { goal = "reflective" } = {}) {
+  const vibes = ["cozy", "tense", "light", "melancholic", "mysterious", "any"];
+  const paces = ["slow", "medium", "fast", "any"];
+  const lengths = ["short", "medium", "long", "any"];
+  const reachable = new Set();
+
+  for (const vibe of vibes) {
+    for (const pace of paces) {
+      for (const length of lengths) {
+        for (let seed = 0; seed < 6; seed++) {
+          for (let page = 0; page < 2; page++) {
+            const result = await recommendBooks(
+              { goal, vibe, genre, pace, length },
+              { chainSeed: seed, chainPage: page, skipExternal: true },
+            );
+            const roles = result.roleRecommendations || {};
+
+            for (const role of ["exact", "safe", "stretch"]) {
+              if (roles[role]) {
+                reachable.add(roles[role].title);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return reachable;
+}
+
+test("жанр «Детектив» открывает нуар и скандинавский криминал, а не только головоломку", async () => {
+  const reachable = await reachableTitlesForGenre("detective", {
+    goal: "emotional",
+  });
+
+  // Классическая головоломка (была достижима и раньше) — не должна пропасть.
+  for (const title of [
+    "Жертва подозреваемого X",
+    "Убийство в Восточном экспрессе",
+    "Приключения Шерлока Холмса",
+  ]) {
+    assert.ok(
+      books.some((book) => book.title === title),
+      `«${title}» пропала из каталога — обнови профиль detective`,
+    );
+    assert.ok(reachable.has(title), `«${title}» больше не достижима как детектив`);
+  }
+
+  // Нуар и скандинавский криминал — раньше были полностью недостижимы.
+  for (const title of [
+    "Мальтийский сокол",
+    "Почтальон всегда звонит дважды",
+    "Нет орхидей для мисс Блэндиш",
+    "Полиция",
+    "Пересыхающее озеро",
+  ]) {
+    assert.ok(
+      books.some((book) => book.title === title),
+      `«${title}» пропала из каталога — обнови профиль detective`,
+    );
+    assert.ok(
+      reachable.has(title),
+      `«${title}» недостижима через жанр «Детектив»`,
+    );
+  }
+});
+
+test("жанр «Классика» открывает русскую классику, а не только японскую", async () => {
+  const reachable = await reachableTitlesForGenre("classic");
+
+  for (const title of [
+    "Братья Карамазовы",
+    "Преступление и наказание",
+    "Отцы и дети",
+    "Обломов",
+    "Палата №6",
+  ]) {
+    assert.ok(
+      books.some((book) => book.title === title),
+      `«${title}» пропала из каталога — обнови профиль classic`,
+    );
+    assert.ok(
+      reachable.has(title),
+      `«${title}» недостижима через жанр «Классика»`,
+    );
+  }
+
+  // Японская классика, которая работала раньше, обязана остаться достижимой.
+  for (const title of ["Кокоро", "Золотой храм"]) {
+    assert.ok(reachable.has(title), `«${title}» больше не достижима как классика`);
+  }
+});
+
+// Пласт криминальной прозы был главным «слепым пятном» опроса. Порог намеренно
+// мягкий (≥16 из 22 книг-детективов достижимы как «Детектив») — это защита от
+// повторного сужения профиля, а не проверка точного состава каталога.
+test("через жанр «Детектив» достижим весь основной криминальный пласт каталога", async () => {
+  const crimeAuthors = new Set([
+    "Дэшилл Хэммет",
+    "Джеймс М. Кейн",
+    "Джеймс Хэдли Чейз",
+    "Корнелл Вулрич",
+    "Ю Несбё",
+    "Арнальдур Индридасон",
+    "Карин Фоссум",
+    "Джозеф Нокс",
+    "Деннис Лихейн",
+    "Кэйго Хигасино",
+    "Агата Кристи",
+    "Артур Конан Дойл",
+    "Джон Диксон Карр",
+    "Эдгар Аллан По",
+    "Сэйтё Мацумото",
+    "Содзи Симада",
+    "Жорж Сименон",
+  ]);
+  const crimeTitles = books
+    .filter((book) => crimeAuthors.has(book.author))
+    .map((book) => book.title);
+  const reachable = await reachableTitlesForGenre("detective", {
+    goal: "emotional",
+  });
+  const found = crimeTitles.filter((title) => reachable.has(title));
+
+  assert.ok(
+    found.length >= 16,
+    `через «Детектив» достижимо только ${found.length} криминальных книг из ${crimeTitles.length}`,
+  );
+});
