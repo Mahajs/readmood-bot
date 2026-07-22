@@ -24,22 +24,16 @@ const bookCardPrefix = "book:";
 const authorCardPrefix = "author:";
 
 const optionCatalog = {
+  // Первый вопрос — про текущее состояние читателя (пять независимых состояний
+  // + случайный режим). Прежние «Подумать о жизни» и «Хочется динамики» убраны:
+  // первое почти не фильтровало каталог, второе дублировало «Отдохнуть»+«Погрузиться».
   goal: {
     rl: { label: "Отдохнуть", value: "relax" },
-    in: { label: "Вдохновиться", value: "inspire" },
+    im: { label: "Погрузиться", value: "immerse" },
     em: { label: "Попереживать", value: "emotional" },
-    rf: { label: "Подумать о жизни", value: "reflective" },
-    es: { label: "Полное погружение", value: "escape" },
-    dy: { label: "Хочется динамики", value: "dynamic" },
+    kn: { label: "Узнать новое", value: "learn" },
+    vd: { label: "Вдохновиться", value: "inspire" },
     ra: { label: "🎲 Удиви меня", value: "random" },
-  },
-  vibe: {
-    cz: { label: "Уютная", value: "cozy" },
-    te: { label: "Напряженная", value: "tense" },
-    li: { label: "Светлая", value: "light" },
-    ml: { label: "Меланхоличная", value: "melancholic" },
-    my: { label: "Таинственная", value: "mysterious" },
-    an: { label: "Не важно", value: "any" },
   },
   genre: {
     nv: { label: "Роман", value: "novel" },
@@ -51,8 +45,30 @@ const optionCatalog = {
     cl: { label: "Классика", value: "classic" },
     an: { label: "Не важно", value: "any" },
   },
+  // Третий вопрос адаптивный: какие коды показываем — зависит от жанра (см.
+  // toneByGenre). Значения совпадают с токенами toneCatalog в recommender.js.
+  tone: {
+    ca: { label: "Спокойное", value: "calm" },
+    pz: { label: "Загадка", value: "puzzle" },
+    tn: { label: "Напряжённое", value: "tense" },
+    gr: { label: "Мрачное", value: "grim" },
+    hv: { label: "Тяжёлое", value: "heavy" },
+    qt: { label: "Тихое", value: "quiet" },
+    lc: { label: "Лёгкое", value: "lightcl" },
+    wm: { label: "Тёплая", value: "warm" },
+    st: { label: "Необычная", value: "strange" },
+    av: { label: "Приключение", value: "adventure" },
+    id: { label: "Про идеи", value: "ideas" },
+    cf: { label: "Уютное", value: "cozyfan" },
+    ep: { label: "Эпическое", value: "epic" },
+    pr: { label: "Для себя", value: "practical" },
+    cu: { label: "Про мир", value: "curious" },
+    pl: { label: "Светлая", value: "prlight" },
+    ps: { label: "Грустная", value: "prsad" },
+    pd: { label: "Напряжённая", value: "prdark" },
+  },
   pace: {
-    sl: { label: "Медленный", value: "slow" },
+    sl: { label: "Спокойный", value: "slow" },
     md: { label: "Средний", value: "medium" },
     fs: { label: "Динамичный", value: "fast" },
     // Кнопки больше нет: "Стремительный" стоял на одной книге каталога и слит с
@@ -62,54 +78,107 @@ const optionCatalog = {
     an: { label: "Не важно", value: "any" },
   },
   length: {
-    sh: { label: "Короткая книга", value: "short" },
-    md: { label: "Средняя по объему", value: "medium" },
-    lg: { label: "Надолго", value: "long" },
+    sh: { label: "Короткую", value: "short" },
+    md: { label: "Среднюю", value: "medium" },
+    lg: { label: "Длинную", value: "long" },
     an: { label: "Не важно", value: "any" },
   },
 };
 
 const sessionSchema = [
   { key: "goal", short: "o" },
-  { key: "vibe", short: "v" },
   { key: "genre", short: "g" },
+  { key: "tone", short: "t" },
   { key: "pace", short: "p" },
   { key: "length", short: "l" },
 ];
 
-const steps = [
-  {
-    key: "goal",
-    question: "Что тебе сейчас хочется получить от книги?",
-    rows: [["rl", "in"], ["em", "rf"], ["es", "dy"], ["ra"]],
-  },
-  {
-    key: "vibe",
-    question: "Какая атмосфера тебе сейчас ближе?",
-    rows: [["cz", "te"], ["li", "ml"], ["my", "an"]],
-  },
-  {
-    key: "genre",
-    question: "Какой жанр тебе ближе сегодня?",
-    rows: [["nv", "de"], ["fa", "sf"], ["nf", "co"], ["cl", "an"]],
-  },
-  {
-    key: "pace",
-    question: "Какой темп сюжета тебе нужен?",
-    rows: [["sl", "md"], ["fs", "an"]],
-  },
-  {
-    key: "length",
-    question: "Какой формат тебе удобнее?",
-    rows: [["sh", "md"], ["lg", "an"]],
-  },
-];
+// Адаптивный третий вопрос: у каждого жанра свой набор ответов и свой текст.
+// Значения — коды из optionCatalog.tone.
+const toneByGenre = {
+  detective: ["ca", "pz", "tn", "gr"],
+  classic: ["hv", "qt", "lc"],
+  "non-fiction": ["pr", "cu"],
+  "sci-fi": ["av", "id"],
+  fantasy: ["cf", "ep"],
+  contemporary: ["wm", "st"],
+  novel: ["pl", "ps", "pd"],
+  any: ["pl", "ps", "pd"],
+};
+
+const toneQuestionByGenre = {
+  detective: "Какое расследование хочется?",
+  classic: "Какое впечатление ищешь?",
+  "non-fiction": "Зачем сейчас читаешь?",
+  "sci-fi": "Какая фантастика ближе?",
+  fantasy: "Какое приключение хочется?",
+  contemporary: "Какая история ближе?",
+  novel: "Какая книга по настроению?",
+  any: "Какая книга по настроению?",
+};
+
+// Темп и объём — слабые литературные разделители; спрашиваем их только там, где
+// они ещё реально сужают выбор. Темп — для крупных жанров (роман, классика);
+// объём — для всех, кроме фэнтези, где после жанра и тона остаётся 2–3 книги.
+const genrePlan = {
+  detective: { askPace: false, askLength: true },
+  classic: { askPace: true, askLength: true },
+  "non-fiction": { askPace: false, askLength: true },
+  "sci-fi": { askPace: false, askLength: true },
+  fantasy: { askPace: false, askLength: false },
+  contemporary: { askPace: false, askLength: true },
+  novel: { askPace: true, askLength: true },
+  any: { askPace: true, askLength: true },
+};
+
+const goalStep = {
+  key: "goal",
+  question: "Что сейчас хочется от книги?",
+  rows: [["rl", "im"], ["em", "kn"], ["vd", "ra"]],
+};
+
+const genreStep = {
+  key: "genre",
+  question: "Какой жанр тебе ближе сегодня?",
+  rows: [["nv", "de"], ["fa", "sf"], ["nf", "co"], ["cl", "an"]],
+};
+
+const paceStep = {
+  key: "pace",
+  question: "В каком темпе хочется читать?",
+  rows: [["sl", "md"], ["fs", "an"]],
+};
+
+const lengthStep = {
+  key: "length",
+  question: "Какого объёма книгу хочешь?",
+  rows: [["sh", "md"], ["lg", "an"]],
+};
+
+function genreValueOf(session) {
+  return session.genre ? optionCatalog.genre[session.genre].value : null;
+}
+
+function toneStepFor(genreValue) {
+  const codes = toneByGenre[genreValue] || toneByGenre.any;
+  const rows = [];
+
+  for (let index = 0; index < codes.length; index += 2) {
+    rows.push(codes.slice(index, index + 2));
+  }
+
+  return {
+    key: "tone",
+    question: toneQuestionByGenre[genreValue] || toneQuestionByGenre.any,
+    rows,
+  };
+}
 
 function createEmptySession() {
   return {
     goal: null,
-    vibe: null,
     genre: null,
+    tone: null,
     pace: null,
     length: null,
   };
@@ -370,12 +439,39 @@ function buildPreferences(session) {
   );
 }
 
+// Адаптивный порядок: состояние → жанр → тон-под-жанр → (темп) → (объём).
+// Жанр идёт вторым, потому что от него зависят и текст третьего вопроса, и то,
+// нужны ли темп с объёмом вообще. Часть жанров завершает опрос раньше.
 function getNextStep(session) {
+  if (!session.goal) {
+    return goalStep;
+  }
+
   if (session.goal === "ra") {
     return null;
   }
 
-  return steps.find((step) => !session[step.key]);
+  if (!session.genre) {
+    return genreStep;
+  }
+
+  const genreValue = genreValueOf(session);
+
+  if (!session.tone) {
+    return toneStepFor(genreValue);
+  }
+
+  const plan = genrePlan[genreValue] || genrePlan.any;
+
+  if (plan.askPace && !session.pace) {
+    return paceStep;
+  }
+
+  if (plan.askLength && !session.length) {
+    return lengthStep;
+  }
+
+  return null;
 }
 
 function buildStepKeyboard(step, session) {
@@ -1129,4 +1225,15 @@ module.exports = {
   getPollingBot,
   getWebhookBot,
   handleTelegramUpdate,
+  // Экспорт внутренних функций опроса — для тестов и симуляции диалога.
+  optionCatalog,
+  sessionSchema,
+  toneByGenre,
+  genrePlan,
+  createEmptySession,
+  getNextStep,
+  buildStepKeyboard,
+  buildPreferences,
+  serializeSession,
+  deserializeSession,
 };

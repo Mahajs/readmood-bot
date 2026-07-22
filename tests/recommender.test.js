@@ -6,57 +6,50 @@ const {
   findLocalBooks,
   buildRecommendationMessage,
   goalToLegacyGoalsMap,
+  toneCatalog,
 } = require("../src/services/recommender");
 const { books } = require("../src/data/books");
+const bot = require("../src/bot");
 
-const goals = [
-  "relax",
-  "inspire",
-  "emotional",
-  "reflective",
-  "escape",
-  "dynamic",
-];
-const vibes = ["cozy", "tense", "light", "melancholic", "mysterious", "any"];
-const genres = [
-  "novel",
-  "detective",
-  "fantasy",
-  "sci-fi",
-  "non-fiction",
-  "contemporary",
-  "classic",
-  "any",
-];
-// "very_fast" больше не отдельный вариант ответа — он слит с "fast".
-const paces = ["slow", "medium", "fast", "any"];
-const lengths = ["short", "medium", "long", "any"];
+// Пять состояний первого вопроса (см. optionCatalog.goal). «random» проверяется
+// отдельным тестом случайного режима.
+const goals = ["relax", "immerse", "emotional", "learn", "inspire"];
 
-function everyCombination() {
-  const combinations = [];
+// Реальные конечные состояния опроса. Опрос адаптивный: третий вопрос (tone)
+// зависит от жанра, а темп и объём спрашиваются не для всех жанров (genrePlan).
+// Перебираем именно то, что пользователь может собрать кнопками, — не абстрактные
+// сочетания полей, которых в интерфейсе не существует.
+function enumerateSurveyStates() {
+  const states = [];
+  const genreValues = Object.keys(bot.toneByGenre);
 
   for (const goal of goals) {
-    for (const vibe of vibes) {
-      for (const genre of genres) {
+    for (const genre of genreValues) {
+      const tones = bot.toneByGenre[genre];
+      const plan = bot.genrePlan[genre];
+      const paces = plan.askPace ? ["slow", "medium", "fast", "any"] : [null];
+      const lengths = plan.askLength ? ["short", "medium", "long", "any"] : [null];
+
+      for (const tone of tones.map((code) => bot.optionCatalog.tone[code].value)) {
         for (const pace of paces) {
           for (const length of lengths) {
-            combinations.push({ goal, vibe, genre, pace, length });
+            states.push({ goal, genre, tone, pace, length });
           }
         }
       }
     }
   }
 
-  return combinations;
+  return states;
 }
 
-// Полный перебор опроса: ни одно сочетание ответов не должно падать или
-// оставлять пользователя без «точного попадания».
-test("любое сочетание ответов даёт рекомендацию", async () => {
-  const combinations = everyCombination();
+// Полный перебор реального опроса: ни одно достижимое сочетание ответов не должно
+// падать или оставлять пользователя без «точного попадания».
+test("любое достижимое сочетание ответов даёт рекомендацию", async () => {
+  const states = enumerateSurveyStates();
   const failures = [];
 
-  for (const preferences of combinations) {
+  for (const preferences of states) {
     let result;
 
     try {
@@ -76,7 +69,7 @@ test("любое сочетание ответов даёт рекомендац
   }
 
   assert.deepEqual(failures.slice(0, 5), []);
-  assert.equal(combinations.length, 4608);
+  assert.ok(states.length > 800, `ожидали много состояний, получили ${states.length}`);
 });
 
 test("выбранный жанр всегда соблюдается в «точном попадании»", async () => {
@@ -89,7 +82,7 @@ test("выбранный жанр всегда соблюдается в «то�
 
   for (const [genre, matches] of Object.entries(genreChecks)) {
     const result = await recommendBooks(
-      { goal: "relax", vibe: "any", genre, pace: "any", length: "any" },
+      { goal: "relax", tone: "any", genre, pace: "any", length: "any" },
       { chainSeed: 1, chainPage: 0, skipExternal: true },
     );
     const exact = result.roleRecommendations.exact;
@@ -116,7 +109,7 @@ test("переименованные книги снова попадают в �
     );
 
     const found = await recommendBooks(
-      { goal: "reflective", vibe: "any", genre, pace: "any", length: "any" },
+      { goal: "emotional", tone: "any", genre, pace: "any", length: "any" },
       { chainSeed: 1, chainPage: 0, skipExternal: true },
     );
 
@@ -126,8 +119,8 @@ test("переименованные книги снова попадают в �
 
 test("цепочка «Еще варианты» не повторяет книги", async () => {
   const preferences = {
-    goal: "escape",
-    vibe: "any",
+    goal: "immerse",
+    tone: "any",
     genre: "any",
     pace: "any",
     length: "any",
@@ -159,7 +152,7 @@ test("цепочка «Еще варианты» не повторяет кни�
 test("один и тот же seed даёт один и тот же результат", async () => {
   const preferences = {
     goal: "relax",
-    vibe: "cozy",
+    tone: "warm",
     genre: "any",
     pace: "any",
     length: "any",
@@ -214,7 +207,7 @@ test("поиск по каталогу находит по названию и �
 test("карточка книги не остаётся без текста", async () => {
   const preferences = {
     goal: "relax",
-    vibe: "any",
+    tone: "any",
     genre: "any",
     pace: "any",
     length: "any",
@@ -230,12 +223,8 @@ test("карточка книги не остаётся без текста", as
   assert.doesNotMatch(message, /undefined/);
 });
 
-// --- Первая итерация улучшений подбора ---
+// --- Первый вопрос: состояния читателя ---
 
-// Кнопка «Попереживать» раньше искала книги с целями «подумать» и
-// «вдохновиться», хотя в каталоге есть отдельное значение «попереживать».
-// Проверяем сам маппинг: доля попаданий зависит от состава каталога, а правило —
-// нет.
 test("цель «Попереживать» ищет книги с целью «попереживать»", () => {
   assert.deepEqual(goalToLegacyGoalsMap.emotional, ["попереживать"]);
 });
@@ -257,10 +246,20 @@ test("каждая цель опроса указывает на значени�
   }
 });
 
+// Пять состояний в опросе должны в точности совпадать с ключами маппинга
+// (кроме случайного режима). Защита от рассинхрона optionCatalog и recommender.
+test("состояния первого вопроса совпадают с маппингом целей", () => {
+  const surveyGoals = Object.values(bot.optionCatalog.goal)
+    .map((entry) => entry.value)
+    .filter((value) => value !== "random");
+
+  assert.deepEqual(surveyGoals.sort(), Object.keys(goalToLegacyGoalsMap).sort());
+});
+
 test("каждый вариант цели остаётся рабочим", async () => {
   for (const goal of goals) {
     const result = await recommendBooks(
-      { goal, vibe: "any", genre: "any", pace: "any", length: "any" },
+      { goal, tone: "any", genre: "any", pace: "any", length: "any" },
       { chainSeed: 1, chainPage: 0, skipExternal: true },
     );
 
@@ -273,10 +272,6 @@ test("каждый вариант цели остаётся рабочим", asy
 
 const complexityRanks = { low: 0, medium: 1, high: 2 };
 
-// Собирает книги, которые алгоритм сам показывает как safe для этих же ответов.
-// Пригодность книги в роли safe от страницы не зависит, меняются только seed и
-// список уже показанного, поэтому любая такая книга была доступна и на первой
-// странице. Это даёт список кандидатов, не дублируя внутренние правила отбора.
 async function collectSafeCandidates(preferences, pages = 6) {
   const candidates = new Map();
 
@@ -297,12 +292,11 @@ async function collectSafeCandidates(preferences, pages = 6) {
 }
 
 // Карточка подписана «Более легкий вариант», поэтому safe не должен быть сложнее
-// exact. Ограничение снимается только там, где подходящего кандидата нет вовсе —
-// и именно это здесь проверяется, без опоры на конкретный жанр или книгу.
+// exact. Ограничение снимается только там, где подходящего кандидата нет вовсе.
 test("если есть кандидат не сложнее exact, safe обязан его выбрать", async () => {
   const avoidable = [];
 
-  for (const preferences of everyCombination()) {
+  for (const preferences of enumerateSurveyStates()) {
     const result = await recommendBooks(preferences, {
       chainSeed: 1,
       chainPage: 0,
@@ -342,7 +336,8 @@ test("если есть кандидат не сложнее exact, safe обя�
 });
 
 // very_fast слит с fast: отдельной категории больше нет, но единственная книга
-// с таким темпом обязана остаться достижимой.
+// с таким темпом обязана остаться достижимой (темп спрашивается для романа и
+// классики, поэтому перебираем эти жанры).
 test("very_fast слит с fast и книга не потеряна", async () => {
   const veryFast = books.filter((book) => book.pace === "very_fast");
 
@@ -352,11 +347,11 @@ test("very_fast слит с fast и книга не потеряна", async () 
 
   const reachable = new Set();
 
-  for (const goal of goals) {
-    for (const vibe of vibes) {
+  for (const genre of ["novel", "classic", "any"]) {
+    for (const tone of bot.toneByGenre[genre].map((c) => bot.optionCatalog.tone[c].value)) {
       for (let page = 0; page < 4; page++) {
         const result = await recommendBooks(
-          { goal, vibe, genre: "any", pace: "fast", length: "any" },
+          { goal: "relax", tone, genre, pace: "fast", length: "any" },
           { chainSeed: 1, chainPage: page, skipExternal: true },
         );
         const roles = result.roleRecommendations || {};
@@ -380,7 +375,7 @@ test("very_fast слит с fast и книга не потеряна", async () 
 
 test("ответ pace=very_fast обрабатывается как fast", async () => {
   const options = { chainSeed: 3, chainPage: 0, skipExternal: true };
-  const base = { goal: "dynamic", vibe: "any", genre: "any", length: "any" };
+  const base = { goal: "relax", tone: "prdark", genre: "novel", length: "any" };
 
   const asFast = await recommendBooks({ ...base, pace: "fast" }, options);
   const asVeryFast = await recommendBooks({ ...base, pace: "very_fast" }, options);
@@ -393,33 +388,24 @@ test("ответ pace=very_fast обрабатывается как fast", async
 
 // --- Покрытие поджанров внутри жанров «Детектив» и «Классика» ---
 //
-// Жанры detective/classic сопоставляются не по полю книги, а по спискам в
-// structuredGenreProfiles. Раньше списки были неполными: «Детектив» находил
-// только классическую головоломку (по теме «детектив»), а весь нуар,
-// скандинавский криминал и мистические новеллы Рампо были недостижимы, хотя
-// это самый крупный тематический пласт каталога. «Классика» пропускала всю
-// русскую классику. Эти тесты фиксируют, что перечисленные книги снова
-// достижимы через свой жанр. Достижимость проверяется через сам алгоритм
-// (роли exact/safe/stretch по разным vibe/seed), а не через внутренние правила.
-
-// Перебирает все ответы vibe/pace/length (то, что реально может выбрать
-// пользователь) и несколько seed/page, собирая все книги, которые алгоритм сам
-// выдаёт в ролях exact/safe/stretch для этого жанра. Length меняется намеренно:
-// тяжёлая классика высокой сложности проходит только в роли exact и выигрывает
-// её лишь при подходящем ответе о длине — как и у реального пользователя.
-async function reachableTitlesForGenre(genre, { goal = "reflective" } = {}) {
-  const vibes = ["cozy", "tense", "light", "melancholic", "mysterious", "any"];
-  const paces = ["slow", "medium", "fast", "any"];
+// Жанры detective/classic сопоставляются по спискам в structuredGenreProfiles.
+// Эти тесты фиксируют, что нуар, скандинавский криминал и русская классика
+// достижимы через свой жанр. Достижимость проверяется через сам алгоритм, по
+// всем адаптивным вариантам тона этого жанра и разным seed.
+async function reachableTitlesForGenre(genre) {
+  const tones = bot.toneByGenre[genre].map((code) => bot.optionCatalog.tone[code].value);
   const lengths = ["short", "medium", "long", "any"];
   const reachable = new Set();
 
-  for (const vibe of vibes) {
-    for (const pace of paces) {
+  // Пользователь может прийти с любым из пяти состояний — сметаем все, чтобы
+  // проверять достижимость книги через жанр целиком, а не через один вход.
+  for (const goal of goals) {
+    for (const tone of tones) {
       for (const length of lengths) {
         for (let seed = 0; seed < 6; seed++) {
           for (let page = 0; page < 2; page++) {
             const result = await recommendBooks(
-              { goal, vibe, genre, pace, length },
+              { goal, tone, genre, pace: "any", length },
               { chainSeed: seed, chainPage: page, skipExternal: true },
             );
             const roles = result.roleRecommendations || {};
@@ -439,11 +425,8 @@ async function reachableTitlesForGenre(genre, { goal = "reflective" } = {}) {
 }
 
 test("жанр «Детектив» открывает нуар и скандинавский криминал, а не только головоломку", async () => {
-  const reachable = await reachableTitlesForGenre("detective", {
-    goal: "emotional",
-  });
+  const reachable = await reachableTitlesForGenre("detective");
 
-  // Классическая головоломка (была достижима и раньше) — не должна пропасть.
   for (const title of [
     "Жертва подозреваемого X",
     "Убийство в Восточном экспрессе",
@@ -456,7 +439,6 @@ test("жанр «Детектив» открывает нуар и сканди�
     assert.ok(reachable.has(title), `«${title}» больше не достижима как детектив`);
   }
 
-  // Нуар и скандинавский криминал — раньше были полностью недостижимы.
   for (const title of [
     "Мальтийский сокол",
     "Почтальон всегда звонит дважды",
@@ -495,15 +477,11 @@ test("жанр «Классика» открывает русскую класс
     );
   }
 
-  // Японская классика, которая работала раньше, обязана остаться достижимой.
   for (const title of ["Кокоро", "Золотой храм"]) {
     assert.ok(reachable.has(title), `«${title}» больше не достижима как классика`);
   }
 });
 
-// Пласт криминальной прозы был главным «слепым пятном» опроса. Порог намеренно
-// мягкий (≥16 из 22 книг-детективов достижимы как «Детектив») — это защита от
-// повторного сужения профиля, а не проверка точного состава каталога.
 test("через жанр «Детектив» достижим весь основной криминальный пласт каталога", async () => {
   const crimeAuthors = new Set([
     "Дэшилл Хэммет",
@@ -527,9 +505,7 @@ test("через жанр «Детектив» достижим весь осн�
   const crimeTitles = books
     .filter((book) => crimeAuthors.has(book.author))
     .map((book) => book.title);
-  const reachable = await reachableTitlesForGenre("detective", {
-    goal: "emotional",
-  });
+  const reachable = await reachableTitlesForGenre("detective");
   const found = crimeTitles.filter((title) => reachable.has(title));
 
   assert.ok(

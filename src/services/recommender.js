@@ -13,39 +13,67 @@ function normalizeText(value) {
     .trim();
 }
 
+// Первый вопрос — про состояние читателя. Пять независимых состояний, каждое
+// маппится на один различающий goal-тег (тег «подумать» намеренно не
+// используется: он стоит на 68/98 книг и ничего не разделяет). Убраны прежние
+// «reflective» (охватывал почти весь каталог) и «dynamic» (= relax ∪ escape).
 const goalToLegacyGoalsMap = {
   relax: ["отдохнуть"],
-  inspire: ["вдохновиться"],
+  immerse: ["погрузиться в мир"],
   emotional: ["попереживать"],
-  reflective: ["подумать", "узнать новое"],
-  escape: ["погрузиться в мир"],
-  dynamic: ["отдохнуть", "погрузиться в мир"]
+  learn: ["узнать новое", "стать эффективнее"],
+  inspire: ["вдохновиться"]
 };
 
 const goalToThemeMap = {
   relax: ["уют", "дружба", "путешествие", "дом", "тепло"],
-  inspire: ["надежда", "рост", "сила духа", "любовь"],
+  immerse: ["мифология", "магия", "тайна", "мир", "приключение"],
   emotional: ["любовь", "потеря", "одиночество", "дружба", "травма"],
-  reflective: ["одиночество", "смысл", "идентичность", "свобода", "общество"],
-  escape: ["мифология", "магия", "тайна", "мир", "приключение"],
-  dynamic: ["приключение", "тайна", "выживание", "интрига"]
+  learn: ["наука", "история", "общество", "идентичность", "культура"],
+  inspire: ["надежда", "рост", "сила духа", "любовь"]
 };
 
-const vibeToLegacyMoodMap = {
-  cozy: ["легкое", "обнадеживающее"],
-  tense: ["мрачное", "приключенческое"],
-  light: ["легкое", "мотивирующее", "обнадеживающее"],
-  melancholic: ["эмоциональное", "вдумчивое"],
-  mysterious: ["вдумчивое", "мрачное", "приключенческое"]
+// Третий вопрос стал адаптивным: у каждого жанра свой набор ответов, но все они
+// сводятся к одному словарю «tone». Каждый токен описывает множество vibe (или
+// mood — для нон-фикшна, где атмосфера не работает, а различает цель чтения).
+// Флаги: heavy — читатель готов к тяжёлому (влияет на подбор «safe»),
+// melancholic — допускает меланхоличное в «safe», comfort — просит уюта/лёгкости.
+const toneCatalog = {
+  // Детектив
+  calm: { vibes: ["cozy", "quiet", "reflective", "light"], comfort: true },
+  puzzle: { vibes: ["mysterious"] },
+  tense: { vibes: ["tense"], heavy: true },
+  grim: { vibes: ["dark"], heavy: true },
+  // Классика
+  heavy: { vibes: ["dark", "tense"], heavy: true },
+  quiet: { vibes: ["melancholic", "quiet", "reflective"], melancholic: true },
+  lightcl: { vibes: ["light", "warm", "mysterious"], comfort: true },
+  // Современная проза
+  warm: { vibes: ["warm", "uplifting", "cozy"], comfort: true },
+  strange: { vibes: ["mysterious", "melancholic", "neutral", "dark", "tense"], heavy: true },
+  // Фантастика
+  adventure: { vibes: ["light"], comfort: true },
+  ideas: { vibes: ["mysterious", "tense", "melancholic"], heavy: true },
+  // Фэнтези
+  cozyfan: { vibes: ["cozy", "warm"], comfort: true },
+  epic: { vibes: ["mysterious", "tense"] },
+  // Нон-фикшн (по mood, а не по vibe)
+  practical: { moods: ["практичное", "мотивирующее"] },
+  curious: { moods: ["любознательное"] },
+  // Роман / «не важно» — общий тон
+  prlight: { vibes: ["cozy", "warm", "light", "uplifting"], comfort: true },
+  prsad: { vibes: ["melancholic", "quiet", "reflective"], melancholic: true },
+  prdark: { vibes: ["dark", "tense", "mysterious", "neutral"], heavy: true }
 };
 
-const vibeToVibeMap = {
-  cozy: ["cozy", "warm"],
-  tense: ["tense", "dark"],
-  light: ["light", "uplifting"],
-  melancholic: ["melancholic", "quiet", "reflective"],
-  mysterious: ["mysterious", "dark"]
-};
+function toneProfile(tone) {
+  return tone && tone !== "any" ? toneCatalog[tone] || null : null;
+}
+
+function toneFlag(preferences, flag) {
+  const profile = toneProfile(preferences.tone);
+  return Boolean(profile && profile[flag]);
+}
 
 const genreToLegacyGenreMap = {
   novel: ["художественная литература"],
@@ -88,20 +116,21 @@ const difficultSafeVibes = ["dark", "melancholic"];
 const cozySafeVibes = ["cozy", "warm", "light"];
 const cozyUnsafeVibes = ["melancholic", "dark", "tense"];
 
-const directHeavyRequests = ["emotional", "reflective"];
+// «Попереживать» — единственное состояние, прямо сигналящее готовность к
+// тяжёлому. Остальную «тяжесть» сообщает адаптивный тон (флаг heavy).
+const directHeavyRequests = ["emotional"];
 
 function getBookVibes(book) {
   return Array.isArray(book.vibe) ? book.vibe : [];
 }
 
 function allowsMelancholicSafe(preferences) {
-  return preferences.vibe === "melancholic";
+  return toneFlag(preferences, "melancholic");
 }
 
 function allowsHeavySafeThemes(preferences) {
   return (
-    preferences.vibe === "melancholic" ||
-    preferences.vibe === "tense" ||
+    toneFlag(preferences, "heavy") ||
     directHeavyRequests.includes(preferences.goal)
   );
 }
@@ -343,12 +372,17 @@ function scoreBook(book, preferences) {
     score += 2;
   }
 
-  if (
-    preferences.vibe &&
-    preferences.vibe !== "any" &&
-    includesAny(book.mood, vibeToLegacyMoodMap[preferences.vibe])
-  ) {
-    score += 3;
+  // Адаптивный тон — самый сильный вопрос системы, поэтому вес выше прочих.
+  const toneP = toneProfile(preferences.tone);
+
+  if (toneP) {
+    if (toneP.vibes && intersects(book.vibe, toneP.vibes)) {
+      score += 4;
+    }
+
+    if (toneP.moods && includesAny(book.mood, toneP.moods)) {
+      score += 4;
+    }
   }
 
   if (
@@ -357,14 +391,6 @@ function scoreBook(book, preferences) {
     includesAny(book.goal, goalToLegacyGoalsMap[preferences.goal])
   ) {
     score += 3;
-  }
-
-  if (
-    preferences.vibe &&
-    preferences.vibe !== "any" &&
-    intersects(book.vibe, vibeToVibeMap[preferences.vibe])
-  ) {
-    score += 2;
   }
 
   if (
@@ -468,11 +494,11 @@ function getSafeScore(book, preferences) {
     safeScore += 2;
   }
 
-  if (preferences.vibe === "cozy" && intersects(vibes, cozySafeVibes)) {
+  if (toneFlag(preferences, "comfort") && intersects(vibes, cozySafeVibes)) {
     safeScore += 3;
   }
 
-  if (preferences.vibe === "cozy" && intersects(vibes, cozyUnsafeVibes)) {
+  if (toneFlag(preferences, "comfort") && intersects(vibes, cozyUnsafeVibes)) {
     safeScore -= 3;
   }
 
@@ -1095,5 +1121,7 @@ module.exports = {
   buildRecommendationMessage,
   buildFindBooksMessage,
   structuredGenreProfiles,
-  goalToLegacyGoalsMap
+  goalToLegacyGoalsMap,
+  toneCatalog,
+  getGenreMatchLevel
 };
