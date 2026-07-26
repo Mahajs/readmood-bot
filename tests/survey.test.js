@@ -97,10 +97,10 @@ function walkSurvey(genreCode, extraPicks = {}) {
 }
 
 test("число шагов опроса зависит от жанра (адаптивная длина)", () => {
-  // fantasy: goal, genre, tone — и всё (3 шага).
+  // fantasy и нон-фикшн: goal, genre, tone — и всё (3 шага).
   assert.deepEqual(walkSurvey("fa").asked, ["goal", "genre", "tone"]);
-  // non-fiction и детектив: без темпа, но с объёмом (4 шага).
-  assert.deepEqual(walkSurvey("nf").asked, ["goal", "genre", "tone", "length"]);
+  assert.deepEqual(walkSurvey("nf").asked, ["goal", "genre", "tone"]);
+  // детектив: без темпа, но с объёмом (4 шага).
   assert.deepEqual(walkSurvey("de").asked, ["goal", "genre", "tone", "length"]);
   // classic и novel: полный опрос (5 шагов).
   assert.deepEqual(walkSurvey("cl").asked, [

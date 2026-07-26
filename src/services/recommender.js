@@ -13,24 +13,23 @@ function normalizeText(value) {
     .trim();
 }
 
-// Первый вопрос — про состояние читателя. Пять независимых состояний, каждое
-// маппится на один различающий goal-тег (тег «подумать» намеренно не
-// используется: он стоит на 68/98 книг и ничего не разделяет). Убраны прежние
-// «reflective» (охватывал почти весь каталог) и «dynamic» (= relax ∪ escape).
+// Первый вопрос — про состояние читателя. Значения соответствуют кнопкам
+// optionCatalog.goal в bot.js: Отдохнуть / Вдохновиться / Попереживать /
+// Подумать о жизни / Полное погружение (+ случайный режим).
 const goalToLegacyGoalsMap = {
   relax: ["отдохнуть"],
-  immerse: ["погрузиться в мир"],
+  inspire: ["вдохновиться"],
   emotional: ["попереживать"],
-  learn: ["узнать новое", "стать эффективнее"],
-  inspire: ["вдохновиться"]
+  reflective: ["подумать", "узнать новое"],
+  immerse: ["погрузиться в мир"]
 };
 
 const goalToThemeMap = {
   relax: ["уют", "дружба", "путешествие", "дом", "тепло"],
-  immerse: ["мифология", "магия", "тайна", "мир", "приключение"],
+  inspire: ["надежда", "рост", "сила духа", "любовь"],
   emotional: ["любовь", "потеря", "одиночество", "дружба", "травма"],
-  learn: ["наука", "история", "общество", "идентичность", "культура"],
-  inspire: ["надежда", "рост", "сила духа", "любовь"]
+  reflective: ["одиночество", "смысл", "идентичность", "свобода", "общество"],
+  immerse: ["мифология", "магия", "тайна", "мир", "приключение"]
 };
 
 // Третий вопрос стал адаптивным: у каждого жанра свой набор ответов, но все они
@@ -48,9 +47,6 @@ const toneCatalog = {
   heavy: { vibes: ["dark", "tense"], heavy: true },
   quiet: { vibes: ["melancholic", "quiet", "reflective"], melancholic: true },
   lightcl: { vibes: ["light", "warm", "mysterious"], comfort: true },
-  // Современная проза
-  warm: { vibes: ["warm", "uplifting", "cozy"], comfort: true },
-  strange: { vibes: ["mysterious", "melancholic", "neutral", "dark", "tense"], heavy: true },
   // Фантастика
   adventure: { vibes: ["light"], comfort: true },
   ideas: { vibes: ["mysterious", "tense", "melancholic"], heavy: true },
@@ -81,7 +77,6 @@ const genreToLegacyGenreMap = {
   fantasy: ["фэнтези"],
   "sci-fi": ["фантастика"],
   "non-fiction": ["психология", "история", "саморазвитие", "продуктивность"],
-  contemporary: ["художественная литература"],
   classic: ["художественная литература"]
 };
 
@@ -116,9 +111,9 @@ const difficultSafeVibes = ["dark", "melancholic"];
 const cozySafeVibes = ["cozy", "warm", "light"];
 const cozyUnsafeVibes = ["melancholic", "dark", "tense"];
 
-// «Попереживать» — единственное состояние, прямо сигналящее готовность к
-// тяжёлому. Остальную «тяжесть» сообщает адаптивный тон (флаг heavy).
-const directHeavyRequests = ["emotional"];
+// Состояния, прямо сигналящие готовность к тяжёлому чтению. Остальную «тяжесть»
+// сообщает адаптивный тон (флаг heavy).
+const directHeavyRequests = ["emotional", "reflective"];
 
 function getBookVibes(book) {
   return Array.isArray(book.vibe) ? book.vibe : [];
@@ -210,30 +205,6 @@ const structuredGenreProfiles = {
     ],
     adjacentTitles: ["Цветы для Элджернона", "Дюна"],
     adjacentThemes: ["свобода", "общество", "одиночество"]
-  },
-  contemporary: {
-    exactTitles: [
-      "Полночная библиотека",
-      "Вторая жизнь Уве",
-      "Кухня",
-      "Цугуми",
-      "Человек-комбини",
-      "Земляноиды",
-      "Магазин чудес \"Намия\"",
-      "Кафка на пляже",
-      "Норвежский лес",
-      "1Q84"
-    ],
-    exactAuthors: [
-      "Мэтт Хейг",
-      "Фредрик Бакман",
-      "Харуки Мураками",
-      "Банана Ёсимото",
-      "Саяка Мурата",
-      "Кэйго Хигасино"
-    ],
-    adjacentTitles: ["Марсианин", "Проект «Аве Мария»"],
-    adjacentThemes: ["идентичность", "выбор", "одиночество"]
   }
 };
 

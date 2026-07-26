@@ -13,7 +13,7 @@ const bot = require("../src/bot");
 
 // Пять состояний первого вопроса (см. optionCatalog.goal). «random» проверяется
 // отдельным тестом случайного режима.
-const goals = ["relax", "immerse", "emotional", "learn", "inspire"];
+const goals = ["relax", "inspire", "emotional", "reflective", "immerse"];
 
 // Реальные конечные состояния опроса. Опрос адаптивный: третий вопрос (tone)
 // зависит от жанра, а темп и объём спрашиваются не для всех жанров (genrePlan).
@@ -99,7 +99,7 @@ test("выбранный жанр всегда соблюдается в «то�
 test("переименованные книги снова попадают в свои жанры", async () => {
   const cases = [
     { title: "Ворота Рассёмон", genre: "classic" },
-    { title: 'Магазин чудес "Намия"', genre: "contemporary" },
+    { title: 'Магазин чудес "Намия"', genre: "novel" },
   ];
 
   for (const { title, genre } of cases) {

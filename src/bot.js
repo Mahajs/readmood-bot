@@ -24,15 +24,13 @@ const bookCardPrefix = "book:";
 const authorCardPrefix = "author:";
 
 const optionCatalog = {
-  // Первый вопрос — про текущее состояние читателя (пять независимых состояний
-  // + случайный режим). Прежние «Подумать о жизни» и «Хочется динамики» убраны:
-  // первое почти не фильтровало каталог, второе дублировало «Отдохнуть»+«Погрузиться».
+  // Первый вопрос — про текущее состояние читателя.
   goal: {
     rl: { label: "Отдохнуть", value: "relax" },
-    im: { label: "Погрузиться", value: "immerse" },
-    em: { label: "Попереживать", value: "emotional" },
-    kn: { label: "Узнать новое", value: "learn" },
     vd: { label: "Вдохновиться", value: "inspire" },
+    em: { label: "Попереживать", value: "emotional" },
+    rf: { label: "Подумать о жизни", value: "reflective" },
+    im: { label: "Полное погружение", value: "immerse" },
     ra: { label: "🎲 Удиви меня", value: "random" },
   },
   genre: {
@@ -41,7 +39,6 @@ const optionCatalog = {
     fa: { label: "Фэнтези", value: "fantasy" },
     sf: { label: "Фантастика", value: "sci-fi" },
     nf: { label: "Нон-фикшн", value: "non-fiction" },
-    co: { label: "Современная проза", value: "contemporary" },
     cl: { label: "Классика", value: "classic" },
     an: { label: "Не важно", value: "any" },
   },
@@ -52,20 +49,18 @@ const optionCatalog = {
     pz: { label: "Загадка", value: "puzzle" },
     tn: { label: "Напряжённое", value: "tense" },
     gr: { label: "Мрачное", value: "grim" },
-    hv: { label: "Тяжёлое", value: "heavy" },
-    qt: { label: "Тихое", value: "quiet" },
-    lc: { label: "Лёгкое", value: "lightcl" },
-    wm: { label: "Тёплая", value: "warm" },
-    st: { label: "Необычная", value: "strange" },
-    av: { label: "Приключение", value: "adventure" },
-    id: { label: "Про идеи", value: "ideas" },
-    cf: { label: "Уютное", value: "cozyfan" },
-    ep: { label: "Эпическое", value: "epic" },
-    pr: { label: "Для себя", value: "practical" },
-    cu: { label: "Про мир", value: "curious" },
-    pl: { label: "Светлая", value: "prlight" },
-    ps: { label: "Грустная", value: "prsad" },
-    pd: { label: "Напряжённая", value: "prdark" },
+    hv: { label: "Заставляющая задуматься", value: "heavy" },
+    qt: { label: "Спокойная", value: "quiet" },
+    lc: { label: "Лёгкая и уютная", value: "lightcl" },
+    av: { label: "Захватывающее приключение", value: "adventure" },
+    id: { label: "Необычные идеи", value: "ideas" },
+    cf: { label: "Волшебное и уютное", value: "cozyfan" },
+    ep: { label: "Масштабное и эпическое", value: "epic" },
+    pr: { label: "Саморазвитие", value: "practical" },
+    cu: { label: "Познавательные книги", value: "curious" },
+    pl: { label: "Светлую", value: "prlight" },
+    ps: { label: "Грустную", value: "prsad" },
+    pd: { label: "Напряжённую", value: "prdark" },
   },
   pace: {
     sl: { label: "Спокойный", value: "slow" },
@@ -101,46 +96,43 @@ const toneByGenre = {
   "non-fiction": ["pr", "cu"],
   "sci-fi": ["av", "id"],
   fantasy: ["cf", "ep"],
-  contemporary: ["wm", "st"],
   novel: ["pl", "ps", "pd"],
   any: ["pl", "ps", "pd"],
 };
 
 const toneQuestionByGenre = {
-  detective: "Какое расследование хочется?",
-  classic: "Какое впечатление ищешь?",
-  "non-fiction": "Зачем сейчас читаешь?",
-  "sci-fi": "Какая фантастика ближе?",
-  fantasy: "Какое приключение хочется?",
-  contemporary: "Какая история ближе?",
-  novel: "Какая книга по настроению?",
-  any: "Какая книга по настроению?",
+  detective: "Какое расследование сейчас хочется?",
+  classic: "Какая классика сегодня ближе?",
+  "non-fiction": "Какое направление сейчас интереснее?",
+  "sci-fi": "Какая фантастика сейчас ближе?",
+  fantasy: "Какое фэнтези сейчас хочется?",
+  novel: "Какую книгу сейчас хочется?",
+  any: "Какую книгу сейчас хочется?",
 };
 
-// Темп и объём — слабые литературные разделители; спрашиваем их только там, где
-// они ещё реально сужают выбор. Темп — для крупных жанров (роман, классика);
-// объём — для всех, кроме фэнтези, где после жанра и тона остаётся 2–3 книги.
+// Темп и объём спрашиваются только там, где они ещё реально сужают выбор. Темп —
+// для романа и классики; объём — для всех, кроме фэнтези (после жанра и тона там
+// остаётся 2–3 книги) и нон-фикшна (объём убран из его ветки).
 const genrePlan = {
   detective: { askPace: false, askLength: true },
   classic: { askPace: true, askLength: true },
-  "non-fiction": { askPace: false, askLength: true },
+  "non-fiction": { askPace: false, askLength: false },
   "sci-fi": { askPace: false, askLength: true },
   fantasy: { askPace: false, askLength: false },
-  contemporary: { askPace: false, askLength: true },
   novel: { askPace: true, askLength: true },
   any: { askPace: true, askLength: true },
 };
 
 const goalStep = {
   key: "goal",
-  question: "Что сейчас хочется от книги?",
-  rows: [["rl", "im"], ["em", "kn"], ["vd", "ra"]],
+  question: "Что тебе сейчас хочется от книги?",
+  rows: [["rl", "vd"], ["em", "rf"], ["im", "ra"]],
 };
 
 const genreStep = {
   key: "genre",
   question: "Какой жанр тебе ближе сегодня?",
-  rows: [["nv", "de"], ["fa", "sf"], ["nf", "co"], ["cl", "an"]],
+  rows: [["nv", "de"], ["fa", "sf"], ["nf", "cl"], ["an"]],
 };
 
 const paceStep = {
@@ -475,7 +467,7 @@ function getNextStep(session) {
 }
 
 function buildStepKeyboard(step, session) {
-  return step.rows.map((row) =>
+  const optionRows = step.rows.map((row) =>
     row.map((code) => {
       const nextSession = { ...session, [step.key]: code };
 
@@ -485,6 +477,9 @@ function buildStepKeyboard(step, session) {
       };
     }),
   );
+
+  // После каждого вопроса опроса — кнопка возврата в меню.
+  return [...optionRows, [{ text: "🏠 В меню", callback_data: menuCallbackData }]];
 }
 
 function buildStartKeyboard() {
