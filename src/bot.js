@@ -937,28 +937,52 @@ async function handleHelp(bot, chatId) {
   );
 }
 
-// Статический прототип обзора трёх рекомендаций через sendRichMessage
-// (rich_message.html). Только для ручной проверки рендеринга командой /richtest —
-// рабочую отправку рекомендаций не трогает.
-const RICH_TEST_HTML = [
-  "<h2>Вот что я бы предложила</h2>",
-  "<p><b>📘 Самое точное попадание</b><br><b>«Игры, в которые играют люди»</b> — Эрик Берн<br>Книга по психологии, в которой Эрик Берн излагает основы транзактного анализа.</p>",
-  "<hr>",
-  "<p><b>🌿 Более легкий вариант</b><br><b>«Эссенциализм»</b> — Грег МакКеон<br>Книга о подходе к работе и жизни, где главным становится осознанный выбор приоритетов.</p>",
-  "<hr>",
-  "<p><b>✨ Вариант чуть в сторону</b><br><b>«Атомные привычки»</b> — Джеймс Клир<br>Нон-фикшн о формировании привычек через маленькие повторяемые действия.</p>",
-].join("");
+// Прототип обзора трёх рекомендаций через sendRichMessage (rich_message.html).
+// Только для ручной проверки рендеринга командой /richtest — рабочую отправку
+// рекомендаций не трогает. Описания берутся из каталога целиком, как в обычном
+// обзоре (никаких сокращений), и экранируются.
+const RICH_TEST_BOOKS = [
+  { emoji: "📘", role: "Самое точное попадание", title: "Игры, в которые играют люди" },
+  { emoji: "🌿", role: "Более легкий вариант", title: "Эссенциализм" },
+  { emoji: "✨", role: "Вариант чуть в сторону", title: "Атомные привычки" },
+];
 
-// Тот же контент, но обычным HTML (b + текстовый разделитель) — на случай, если
+function resolveRichTestBooks() {
+  return RICH_TEST_BOOKS.map((entry) => ({
+    ...entry,
+    book: books.find((candidate) => candidate.title === entry.title),
+  })).filter((entry) => entry.book);
+}
+
+function buildRichTestHtml() {
+  const blocks = resolveRichTestBooks().map(
+    ({ emoji, role, book }) =>
+      `<p><b>${emoji} ${escapeHtml(role)}</b><br><b>«${escapeHtml(
+        book.title,
+      )}»</b> — ${escapeHtml(book.author)}<br>${escapeHtml(
+        book.description,
+      )}</p>`,
+  );
+
+  return `<h2>Вот что я бы предложила</h2>${blocks.join("<hr>")}`;
+}
+
+// Тот же контент обычным HTML (b + текстовый разделитель) — fallback, если
 // sendRichMessage недоступен на клиенте или вернёт ошибку.
-const RICH_TEST_FALLBACK_HTML = [
-  "Вот что я бы предложила:",
-  "📘 <b>Самое точное попадание</b>\n<b>«Игры, в которые играют люди»</b> — Эрик Берн\nКнига по психологии, в которой Эрик Берн излагает основы транзактного анализа.",
-  "────────",
-  "🌿 <b>Более легкий вариант</b>\n<b>«Эссенциализм»</b> — Грег МакКеон\nКнига о подходе к работе и жизни, где главным становится осознанный выбор приоритетов.",
-  "────────",
-  "✨ <b>Вариант чуть в сторону</b>\n<b>«Атомные привычки»</b> — Джеймс Клир\nНон-фикшн о формировании привычек через маленькие повторяемые действия.",
-].join("\n\n");
+function buildRichTestFallbackHtml() {
+  const divider = "────────";
+  const blocks = resolveRichTestBooks().map(({ emoji, role, book }) =>
+    [
+      `${emoji} <b>${escapeHtml(role)}</b>`,
+      `<b>«${escapeHtml(book.title)}»</b> — ${escapeHtml(book.author)}`,
+      escapeHtml(book.description),
+    ].join("\n"),
+  );
+
+  return ["Вот что я бы предложила:", blocks.join(`\n\n${divider}\n\n`)].join(
+    "\n\n",
+  );
+}
 
 async function handleRichTest(bot, chatId) {
   const replyMarkup = { inline_keyboard: buildStartKeyboard() };
@@ -966,7 +990,7 @@ async function handleRichTest(bot, chatId) {
   try {
     await sendRichMessageHtml({
       chatId,
-      html: RICH_TEST_HTML,
+      html: buildRichTestHtml(),
       replyMarkup,
     });
   } catch (error) {
@@ -975,7 +999,7 @@ async function handleRichTest(bot, chatId) {
       telegramError: error?.telegramError || null,
     });
 
-    await bot.sendMessage(chatId, RICH_TEST_FALLBACK_HTML, {
+    await bot.sendMessage(chatId, buildRichTestFallbackHtml(), {
       parse_mode: "HTML",
       reply_markup: replyMarkup,
     });
