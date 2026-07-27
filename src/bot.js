@@ -359,8 +359,8 @@ function buildBookCardMessage(book, options = {}) {
     blocks.push(options.lead);
   }
 
-  blocks.push(`«${book.title}» — ${book.author}`);
-  blocks.push(book.recommendationText || book.description);
+  blocks.push(`<b>«${escapeHtml(book.title)}»</b> — ${escapeHtml(book.author)}`);
+  blocks.push(escapeHtml(book.recommendationText || book.description));
 
   return blocks.join("\n\n");
 }
@@ -370,7 +370,7 @@ function buildAuthorCardMessage(profile) {
   const safeBio = escapeHtml(
     profile?.bio || "Карточка автора скоро появится.",
   );
-  const blocks = [`👤 ${safeName}`, safeBio];
+  const blocks = [`👤 <b>${safeName}</b>`, safeBio];
 
   if (profile?.wikiUrl) {
     blocks.push(
@@ -393,6 +393,7 @@ async function sendBookCard(bot, chatId, book, keyboard, options = {}) {
     try {
       await bot.sendPhoto(chatId, coverUrl, {
         caption: message,
+        parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: inlineKeyboard,
         },
@@ -408,6 +409,7 @@ async function sendBookCard(bot, chatId, book, keyboard, options = {}) {
   }
 
   await bot.sendMessage(chatId, message, {
+    parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: inlineKeyboard,
     },
@@ -748,6 +750,7 @@ async function sendRecommendations(bot, chatId, session, currentRecommendationSt
     chatId,
     message,
     {
+      parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: keyboard,
       },

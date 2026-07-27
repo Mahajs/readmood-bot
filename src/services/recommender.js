@@ -932,6 +932,16 @@ async function findBooks(query, options = {}) {
   };
 }
 
+// Обзор рекомендаций отправляется с parse_mode HTML (см. sendRecommendations),
+// поэтому подставляемые названия, авторы и описания нужно экранировать.
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function buildRecommendationMessage(preferences, recommendationSet) {
   if (recommendationSet.exhausted) {
     if (recommendationSet.exhaustedKind === "random") {
@@ -946,33 +956,32 @@ function buildRecommendationMessage(preferences, recommendationSet) {
 
   if (recommendationSet.roleRecommendations) {
     const { exact, safe, stretch } = recommendationSet.roleRecommendations;
-    const blocks = [["Вот что я бы предложила:"]];
+    // Тонкая линия-разделитель между тремя рекомендациями, чтобы обзор читался
+    // как три отдельные карточки, а не сплошное полотно.
+    const divider = "────────";
+    const parts = [];
 
-    if (exact) {
-      blocks.push([
-        "📘 Самое точное попадание",
-        `«${exact.title}» — ${exact.author}`,
-        exact.recommendationText || exact.description
-      ]);
-    }
+    const pushBook = (emoji, label, book) => {
+      if (!book) {
+        return;
+      }
 
-    if (safe) {
-      blocks.push([
-        "🌿 Более легкий вариант",
-        `«${safe.title}» — ${safe.author}`,
-        safe.recommendationText || safe.description
-      ]);
-    }
+      parts.push(
+        [
+          `${emoji} <b>${escapeHtml(label)}</b>`,
+          `<b>«${escapeHtml(book.title)}»</b> — ${escapeHtml(book.author)}`,
+          escapeHtml(book.recommendationText || book.description),
+        ].join("\n"),
+      );
+    };
 
-    if (stretch) {
-      blocks.push([
-        "✨ Вариант чуть в сторону",
-        `«${stretch.title}» — ${stretch.author}`,
-        stretch.recommendationText || stretch.description
-      ]);
-    }
+    pushBook("📘", "Самое точное попадание", exact);
+    pushBook("🌿", "Более легкий вариант", safe);
+    pushBook("✨", "Вариант чуть в сторону", stretch);
 
-    return blocks.map((block) => block.join("\n")).join("\n\n");
+    return ["Вот что я бы предложила:", parts.join(`\n\n${divider}\n\n`)].join(
+      "\n\n",
+    );
   }
 
   const { localRecommendations, externalRecommendations, externalError } =
@@ -1002,9 +1011,9 @@ function buildRecommendationMessage(preferences, recommendationSet) {
         localRecommendations
           .map(
             (book, index) =>
-              `${index + 1}. ${book.title} — ${book.author}\n${
-                book.recommendationText || book.description
-              }`
+              `${index + 1}. ${escapeHtml(book.title)} — ${escapeHtml(
+                book.author,
+              )}\n${escapeHtml(book.recommendationText || book.description)}`
           )
           .join("\n\n")
       ].join("\n")
@@ -1018,7 +1027,9 @@ function buildRecommendationMessage(preferences, recommendationSet) {
         externalRecommendations
           .map(
             (book, index) =>
-              `${index + 1}. ${book.title} — ${book.author}\n${book.recommendationText}`
+              `${index + 1}. ${escapeHtml(book.title)} — ${escapeHtml(
+                book.author,
+              )}\n${escapeHtml(book.recommendationText)}`
           )
           .join("\n\n")
       ].join("\n")
