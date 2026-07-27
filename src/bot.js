@@ -1006,6 +1006,111 @@ async function handleRichTest(bot, chatId) {
   }
 }
 
+// --- Прототип rich-карточки автора (/authortest) ---
+// Курсивом выделяются все закавыченные «…» фрагменты (названия произведений и
+// термины) — сам текст биографии не меняется. Длинную биографию делим на абзацы
+// по границам предложений, чтобы она не была стеной текста.
+function emphasizeQuoted(escapedText) {
+  return escapedText.replace(/«[^«»]*»/g, "<i>$&</i>");
+}
+
+function splitBioIntoParagraphs(bio) {
+  const text = String(bio || "");
+  const sentences = text.split(/(?<=\.)\s+/).filter(Boolean);
+
+  if (sentences.length < 3) {
+    return [text];
+  }
+
+  const mid = text.length / 2;
+  let acc = 0;
+  let cut = 1;
+
+  for (let i = 0; i < sentences.length; i += 1) {
+    acc += sentences[i].length + 1;
+    if (acc >= mid) {
+      cut = i + 1;
+      break;
+    }
+  }
+
+  cut = Math.min(Math.max(cut, 1), sentences.length - 1);
+
+  return [sentences.slice(0, cut).join(" "), sentences.slice(cut).join(" ")];
+}
+
+function buildAuthorCardRichHtml(profile, extras = {}) {
+  const name = escapeHtml(profile?.name || "");
+  const parts = [`<h2>👤 ${name}</h2>`];
+
+  // Подзаголовок: роль • годы жизни. Пока приходит извне (в базе такого поля нет).
+  if (extras.subtitle) {
+    parts.push(`<p>${escapeHtml(extras.subtitle)}</p>`);
+  }
+
+  parts.push("<hr>");
+
+  parts.push(
+    splitBioIntoParagraphs(profile?.bio || "Карточка автора скоро появится.")
+      .map((paragraph) => `<p>${emphasizeQuoted(escapeHtml(paragraph))}</p>`)
+      .join(""),
+  );
+
+  // Блок «Самые известные произведения» — списком. Данных в базе нет, поэтому
+  // список приходит извне (для прототипа — вручную).
+  if (Array.isArray(extras.works) && extras.works.length) {
+    const items = extras.works
+      .map((work) => `<li>${escapeHtml(work)}</li>`)
+      .join("");
+    parts.push(
+      `<hr><p><b>📖 Самые известные произведения</b></p><ul>${items}</ul>`,
+    );
+  }
+
+  if (profile?.wikiUrl) {
+    parts.push(
+      "<hr><p>📚 <b>Подробнее</b><br>" +
+        `<a href="${escapeHtml(profile.wikiUrl)}">${name} в Википедии</a></p>`,
+    );
+  }
+
+  return parts.join("");
+}
+
+async function handleAuthorTest(bot, chatId) {
+  const profile = findAuthorProfileByName("Эдогава Рампо");
+  const replyMarkup = { inline_keyboard: buildStartKeyboard() };
+
+  // Структурные поля, которых пока нет в базе, — вписаны вручную для прототипа.
+  const extras = {
+    subtitle: "Японский писатель • 1894–1965",
+    works: ["Человек-кресло", "Гусеница", "Ад зеркал", "Чудовище во мраке"],
+  };
+
+  if (!profile) {
+    await bot.sendMessage(chatId, "Профиль автора для теста не найден.");
+    return;
+  }
+
+  try {
+    await sendRichMessageHtml({
+      chatId,
+      html: buildAuthorCardRichHtml(profile, extras),
+      replyMarkup,
+    });
+  } catch (error) {
+    console.warn("author rich test failed, falling back to HTML", {
+      chatId,
+      telegramError: error?.telegramError || null,
+    });
+
+    await bot.sendMessage(chatId, buildAuthorCardMessage(profile), {
+      parse_mode: "HTML",
+      reply_markup: replyMarkup,
+    });
+  }
+}
+
 async function handleMessage(bot, message) {
   if (!message?.chat?.id || !message.text) {
     console.log("Skipping message without chatId/text");
@@ -1048,6 +1153,11 @@ async function handleMessage(bot, message) {
 
   if (command === "/richtest") {
     await handleRichTest(bot, chatId);
+    return;
+  }
+
+  if (command === "/authortest") {
+    await handleAuthorTest(bot, chatId);
     return;
   }
 
