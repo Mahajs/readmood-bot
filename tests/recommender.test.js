@@ -16,25 +16,24 @@ const bot = require("../src/bot");
 const goals = ["relax", "inspire", "emotional", "reflective", "immerse"];
 
 // Реальные конечные состояния опроса. Опрос адаптивный: третий вопрос (tone)
-// зависит от жанра, а темп и объём спрашиваются не для всех жанров (genrePlan).
-// Перебираем именно то, что пользователь может собрать кнопками, — не абстрактные
-// сочетания полей, которых в интерфейсе не существует.
+// зависит от жанра, а темп спрашивается не для всех жанров (genrePlan). Вопрос об
+// объёме убран из опроса полностью. Перебираем именно то, что пользователь может
+// собрать кнопками, — не абстрактные сочетания полей, которых в интерфейсе нет.
 function enumerateSurveyStates() {
   const states = [];
   const genreValues = Object.keys(bot.toneByGenre);
+  // Пользователь может выбрать и «Не важно» (any) в первом вопросе.
+  const surveyGoals = [...goals, "any"];
 
-  for (const goal of goals) {
+  for (const goal of surveyGoals) {
     for (const genre of genreValues) {
       const tones = bot.toneByGenre[genre];
       const plan = bot.genrePlan[genre];
       const paces = plan.askPace ? ["slow", "medium", "fast", "any"] : [null];
-      const lengths = plan.askLength ? ["short", "medium", "long", "any"] : [null];
 
       for (const tone of tones.map((code) => bot.optionCatalog.tone[code].value)) {
         for (const pace of paces) {
-          for (const length of lengths) {
-            states.push({ goal, genre, tone, pace, length });
-          }
+          states.push({ goal, genre, tone, pace, length: null });
         }
       }
     }
@@ -69,7 +68,7 @@ test("любое достижимое сочетание ответов даёт
   }
 
   assert.deepEqual(failures.slice(0, 5), []);
-  assert.ok(states.length > 800, `ожидали много состояний, получили ${states.length}`);
+  assert.ok(states.length > 200, `ожидали много состояний, получили ${states.length}`);
 });
 
 test("выбранный жанр всегда соблюдается в «точном попадании»", async () => {
@@ -246,12 +245,13 @@ test("каждая цель опроса указывает на значени�
   }
 });
 
-// Пять состояний в опросе должны в точности совпадать с ключами маппинга
-// (кроме случайного режима). Защита от рассинхрона optionCatalog и recommender.
+// Содержательные состояния в опросе должны в точности совпадать с ключами
+// маппинга. «random» (случайный режим) и «any» («Не важно» — намеренно не даёт
+// бонуса по цели) исключены. Защита от рассинхрона optionCatalog и recommender.
 test("состояния первого вопроса совпадают с маппингом целей", () => {
   const surveyGoals = Object.values(bot.optionCatalog.goal)
     .map((entry) => entry.value)
-    .filter((value) => value !== "random");
+    .filter((value) => value !== "random" && value !== "any");
 
   assert.deepEqual(surveyGoals.sort(), Object.keys(goalToLegacyGoalsMap).sort());
 });
@@ -266,6 +266,26 @@ test("каждый вариант цели остаётся рабочим", asy
     assert.ok(
       result.roleRecommendations && result.roleRecommendations.exact,
       `цель "${goal}" не вернула рекомендацию`,
+    );
+  }
+});
+
+// «Не важно» (goal=any) намеренно не даёт бонуса по цели, но обязана оставаться
+// рабочим состоянием опроса. Тон всегда конкретный (шаг tone не предлагает «any»),
+// поэтому у книги остаётся источник очков — рекомендация обязана находиться.
+test("вариант «Не важно» в первом вопросе возвращает рекомендацию", async () => {
+  const genreValues = Object.keys(bot.toneByGenre);
+
+  for (const genre of genreValues) {
+    const tone = bot.optionCatalog.tone[bot.toneByGenre[genre][0]].value;
+    const result = await recommendBooks(
+      { goal: "any", tone, genre, pace: "any", length: null },
+      { chainSeed: 1, chainPage: 0, skipExternal: true },
+    );
+
+    assert.ok(
+      result.roleRecommendations && result.roleRecommendations.exact,
+      `цель «Не важно» (any) не вернула рекомендацию для жанра "${genre}"`,
     );
   }
 });

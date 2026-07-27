@@ -31,6 +31,7 @@ const optionCatalog = {
     em: { label: "Попереживать", value: "emotional" },
     rf: { label: "Подумать о жизни", value: "reflective" },
     im: { label: "Полное погружение", value: "immerse" },
+    an: { label: "Не важно", value: "any" },
     ra: { label: "🎲 Удиви меня", value: "random" },
   },
   genre: {
@@ -110,23 +111,23 @@ const toneQuestionByGenre = {
   any: "Какую книгу сейчас хочется?",
 };
 
-// Темп и объём спрашиваются только там, где они ещё реально сужают выбор. Темп —
-// для романа и классики; объём — для всех, кроме фэнтези (после жанра и тона там
-// остаётся 2–3 книги) и нон-фикшна (объём убран из его ветки).
+// Темп спрашивается только у романа и классики — только там он ещё реально
+// сужает выбор. У остальных жанров после жанра и тона рекомендация выдаётся
+// сразу. Вопрос об объёме убран из опроса полностью.
 const genrePlan = {
-  detective: { askPace: false, askLength: true },
-  classic: { askPace: true, askLength: true },
-  "non-fiction": { askPace: false, askLength: false },
-  "sci-fi": { askPace: false, askLength: true },
-  fantasy: { askPace: false, askLength: false },
-  novel: { askPace: true, askLength: true },
-  any: { askPace: true, askLength: true },
+  detective: { askPace: false },
+  classic: { askPace: true },
+  "non-fiction": { askPace: false },
+  "sci-fi": { askPace: false },
+  fantasy: { askPace: false },
+  novel: { askPace: true },
+  any: { askPace: true },
 };
 
 const goalStep = {
   key: "goal",
   question: "Что тебе сейчас хочется от книги?",
-  rows: [["rl", "vd"], ["em", "rf"], ["im", "ra"]],
+  rows: [["rl", "vd"], ["em", "rf"], ["im", "an"], ["ra"]],
 };
 
 const genreStep = {
@@ -141,28 +142,19 @@ const paceStep = {
   rows: [["sl", "md"], ["fs", "an"]],
 };
 
-const lengthStep = {
-  key: "length",
-  question: "Какого объёма книгу хочешь?",
-  rows: [["sh", "md"], ["lg", "an"]],
-};
-
 function genreValueOf(session) {
   return session.genre ? optionCatalog.genre[session.genre].value : null;
 }
 
+// Адаптивный третий вопрос — по одной кнопке в строку: у тона самые длинные
+// подписи, а полная ширина строки не даёт Telegram обрезать текст.
 function toneStepFor(genreValue) {
   const codes = toneByGenre[genreValue] || toneByGenre.any;
-  const rows = [];
-
-  for (let index = 0; index < codes.length; index += 2) {
-    rows.push(codes.slice(index, index + 2));
-  }
 
   return {
     key: "tone",
     question: toneQuestionByGenre[genreValue] || toneQuestionByGenre.any,
-    rows,
+    rows: codes.map((code) => [code]),
   };
 }
 
@@ -457,10 +449,6 @@ function getNextStep(session) {
 
   if (plan.askPace && !session.pace) {
     return paceStep;
-  }
-
-  if (plan.askLength && !session.length) {
-    return lengthStep;
   }
 
   return null;

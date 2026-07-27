@@ -359,6 +359,7 @@ function scoreBook(book, preferences) {
   if (
     preferences.goal &&
     preferences.goal !== "random" &&
+    preferences.goal !== "any" &&
     includesAny(book.goal, goalToLegacyGoalsMap[preferences.goal])
   ) {
     score += 3;
@@ -367,6 +368,7 @@ function scoreBook(book, preferences) {
   if (
     preferences.goal &&
     preferences.goal !== "random" &&
+    preferences.goal !== "any" &&
     intersects(book.themes, goalToThemeMap[preferences.goal])
   ) {
     score += 2;
