@@ -7,6 +7,7 @@ const {
   buildFindBooksMessage,
 } = require("./services/recommender");
 const { findAuthorProfileByName } = require("./data/authors");
+const { sendRichMessageHtml } = require("./services/richMessage");
 
 const callbackPrefix = "state:";
 const moreRecommendationsPrefix = "more:";
@@ -936,6 +937,51 @@ async function handleHelp(bot, chatId) {
   );
 }
 
+// Статический прототип обзора трёх рекомендаций через sendRichMessage
+// (rich_message.html). Только для ручной проверки рендеринга командой /richtest —
+// рабочую отправку рекомендаций не трогает.
+const RICH_TEST_HTML = [
+  "<h2>Вот что я бы предложила</h2>",
+  "<p><b>📘 Самое точное попадание</b><br><b>«Игры, в которые играют люди»</b> — Эрик Берн<br>Книга по психологии, в которой Эрик Берн излагает основы транзактного анализа.</p>",
+  "<hr>",
+  "<p><b>🌿 Более легкий вариант</b><br><b>«Эссенциализм»</b> — Грег МакКеон<br>Книга о подходе к работе и жизни, где главным становится осознанный выбор приоритетов.</p>",
+  "<hr>",
+  "<p><b>✨ Вариант чуть в сторону</b><br><b>«Атомные привычки»</b> — Джеймс Клир<br>Нон-фикшн о формировании привычек через маленькие повторяемые действия.</p>",
+].join("");
+
+// Тот же контент, но обычным HTML (b + текстовый разделитель) — на случай, если
+// sendRichMessage недоступен на клиенте или вернёт ошибку.
+const RICH_TEST_FALLBACK_HTML = [
+  "Вот что я бы предложила:",
+  "📘 <b>Самое точное попадание</b>\n<b>«Игры, в которые играют люди»</b> — Эрик Берн\nКнига по психологии, в которой Эрик Берн излагает основы транзактного анализа.",
+  "────────",
+  "🌿 <b>Более легкий вариант</b>\n<b>«Эссенциализм»</b> — Грег МакКеон\nКнига о подходе к работе и жизни, где главным становится осознанный выбор приоритетов.",
+  "────────",
+  "✨ <b>Вариант чуть в сторону</b>\n<b>«Атомные привычки»</b> — Джеймс Клир\nНон-фикшн о формировании привычек через маленькие повторяемые действия.",
+].join("\n\n");
+
+async function handleRichTest(bot, chatId) {
+  const replyMarkup = { inline_keyboard: buildStartKeyboard() };
+
+  try {
+    await sendRichMessageHtml({
+      chatId,
+      html: RICH_TEST_HTML,
+      replyMarkup,
+    });
+  } catch (error) {
+    console.warn("sendRichMessage test failed, falling back to HTML", {
+      chatId,
+      telegramError: error?.telegramError || null,
+    });
+
+    await bot.sendMessage(chatId, RICH_TEST_FALLBACK_HTML, {
+      parse_mode: "HTML",
+      reply_markup: replyMarkup,
+    });
+  }
+}
+
 async function handleMessage(bot, message) {
   if (!message?.chat?.id || !message.text) {
     console.log("Skipping message without chatId/text");
@@ -973,6 +1019,11 @@ async function handleMessage(bot, message) {
 
   if (command === "/help") {
     await handleHelp(bot, chatId);
+    return;
+  }
+
+  if (command === "/richtest") {
+    await handleRichTest(bot, chatId);
     return;
   }
 
