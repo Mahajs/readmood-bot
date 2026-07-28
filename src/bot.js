@@ -373,6 +373,16 @@ function buildAuthorCardMessage(profile) {
   );
   const blocks = [`👤 <b>${safeName}</b>`, safeBio];
 
+  const works = Array.isArray(profile?.notableWorks) ? profile.notableWorks : [];
+  if (works.length) {
+    blocks.push(
+      [
+        "📖 <b>Самые известные произведения:</b>",
+        ...works.map((work) => `• ${escapeHtml(work)}`),
+      ].join("\n"),
+    );
+  }
+
   if (profile?.wikiUrl) {
     blocks.push(
       [
@@ -660,11 +670,28 @@ function buildAuthorInfoKeyboard() {
 }
 
 async function sendAuthorCard(bot, chatId, profile) {
-  const message = buildAuthorCardMessage(profile);
-  const portraitUrl = resolveAuthorPortraitUrl(profile?.portraitPath);
   const replyMarkup = {
     inline_keyboard: buildAuthorInfoKeyboard(),
   };
+
+  // Основной путь — rich-карточка (sendRichMessage). Если недоступно/ошибка —
+  // откатываемся на прежнюю карточку (портрет с подписью либо обычный HTML).
+  try {
+    await sendRichMessageHtml({
+      chatId,
+      html: buildAuthorCardRichHtml(profile),
+      replyMarkup,
+    });
+    return;
+  } catch (error) {
+    console.warn("Author rich card failed, falling back to HTML", {
+      chatId,
+      telegramError: error?.telegramError || null,
+    });
+  }
+
+  const message = buildAuthorCardMessage(profile);
+  const portraitUrl = resolveAuthorPortraitUrl(profile?.portraitPath);
 
   if (portraitUrl) {
     try {
@@ -1039,16 +1066,9 @@ function splitBioIntoParagraphs(bio) {
   return [sentences.slice(0, cut).join(" "), sentences.slice(cut).join(" ")];
 }
 
-function buildAuthorCardRichHtml(profile, extras = {}) {
+function buildAuthorCardRichHtml(profile) {
   const name = escapeHtml(profile?.name || "");
-  const parts = [`<h2>👤 ${name}</h2>`];
-
-  // Подзаголовок: роль • годы жизни. Пока приходит извне (в базе такого поля нет).
-  if (extras.subtitle) {
-    parts.push(`<p>${escapeHtml(extras.subtitle)}</p>`);
-  }
-
-  parts.push("<hr>");
+  const parts = [`<h2>👤 ${name}</h2>`, "<hr>"];
 
   parts.push(
     splitBioIntoParagraphs(profile?.bio || "Карточка автора скоро появится.")
@@ -1056,12 +1076,9 @@ function buildAuthorCardRichHtml(profile, extras = {}) {
       .join(""),
   );
 
-  // Блок «Самые известные произведения» — списком. Данных в базе нет, поэтому
-  // список приходит извне (для прототипа — вручную).
-  if (Array.isArray(extras.works) && extras.works.length) {
-    const items = extras.works
-      .map((work) => `<li>${escapeHtml(work)}</li>`)
-      .join("");
+  const works = Array.isArray(profile?.notableWorks) ? profile.notableWorks : [];
+  if (works.length) {
+    const items = works.map((work) => `<li>${escapeHtml(work)}</li>`).join("");
     parts.push(
       `<hr><p><b>📖 Самые известные произведения</b></p><ul>${items}</ul>`,
     );
@@ -1069,7 +1086,7 @@ function buildAuthorCardRichHtml(profile, extras = {}) {
 
   if (profile?.wikiUrl) {
     parts.push(
-      "<hr><p>📚 <b>Подробнее</b><br>" +
+      "<hr><p>📚 <b>Подробнее об авторе:</b><br>" +
         `<a href="${escapeHtml(profile.wikiUrl)}">${name} в Википедии</a></p>`,
     );
   }
@@ -1077,38 +1094,16 @@ function buildAuthorCardRichHtml(profile, extras = {}) {
   return parts.join("");
 }
 
+// Тестовый триггер: открывает реальную rich-карточку автора на примере Рампо.
 async function handleAuthorTest(bot, chatId) {
   const profile = findAuthorProfileByName("Эдогава Рампо");
-  const replyMarkup = { inline_keyboard: buildStartKeyboard() };
-
-  // Структурные поля, которых пока нет в базе, — вписаны вручную для прототипа.
-  const extras = {
-    subtitle: "Японский писатель • 1894–1965",
-    works: ["Человек-кресло", "Гусеница", "Ад зеркал", "Чудовище во мраке"],
-  };
 
   if (!profile) {
     await bot.sendMessage(chatId, "Профиль автора для теста не найден.");
     return;
   }
 
-  try {
-    await sendRichMessageHtml({
-      chatId,
-      html: buildAuthorCardRichHtml(profile, extras),
-      replyMarkup,
-    });
-  } catch (error) {
-    console.warn("author rich test failed, falling back to HTML", {
-      chatId,
-      telegramError: error?.telegramError || null,
-    });
-
-    await bot.sendMessage(chatId, buildAuthorCardMessage(profile), {
-      parse_mode: "HTML",
-      reply_markup: replyMarkup,
-    });
-  }
+  await sendAuthorCard(bot, chatId, profile);
 }
 
 async function handleMessage(bot, message) {
