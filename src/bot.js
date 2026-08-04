@@ -1068,7 +1068,14 @@ function splitBioIntoParagraphs(bio) {
 
 function buildAuthorCardRichHtml(profile) {
   const name = escapeHtml(profile?.name || "");
-  const parts = [`<h2>👤 ${name}</h2>`, "<hr>"];
+  const parts = [];
+
+  const portraitUrl = resolveAuthorPortraitUrl(profile?.portraitPath);
+  if (portraitUrl) {
+    parts.push(`<img src="${escapeHtml(portraitUrl)}"/>`);
+  }
+
+  parts.push(`<h2>👤 ${name}</h2>`, "<hr>");
 
   parts.push(
     splitBioIntoParagraphs(profile?.bio || "Карточка автора скоро появится.")
