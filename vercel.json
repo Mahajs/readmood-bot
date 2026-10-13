@@ -3,6 +3,15 @@
   "functions": {
     "api/telegram-webhook.js": {
       "maxDuration": 10
+    },
+    "api/health-check.js": {
+      "maxDuration": 10
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/health-check",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }

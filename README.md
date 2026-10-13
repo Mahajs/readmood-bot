@@ -257,3 +257,41 @@ Useful commands:
 
 - `npm run webhook:status` — show the current webhook registration (read-only).
 - `npm run token:fingerprint` — print the SHA-256 fingerprint of the current token.
+
+## Monitoring (Vercel Cron health check)
+
+A scheduled health check verifies the live bot once per day and messages the
+administrator on Telegram only when something is wrong.
+
+- Endpoint: `api/health-check.js`. It is read-only toward Telegram — it calls
+  `getWebhookInfo` and, on a problem, `sendMessage`. It never calls
+  `setWebhook`/`deleteWebhook` and never touches the recommendation logic or the
+  webhook handler.
+- Schedule: `vercel.json` → `crons`, `0 9 * * *` (daily, 09:00 UTC). This fits the
+  Vercel **Hobby** limit of one cron run per day (precision ±1 hour).
+- Authorization: the endpoint is protected by `CRON_SECRET`. Vercel Cron sends it
+  as `Authorization: Bearer <CRON_SECRET>`; the endpoint **fails closed** if the
+  header is missing or wrong, and the secret never appears in a URL.
+- Checks: webhook is registered, its url matches `WEBHOOK_BASE_URL`, no *recent*
+  delivery error (errors older than 24h are ignored), and the pending-update
+  backlog is not abnormally high.
+- Alerts: a single consolidated private message to `ADMIN_CHAT_ID`. If everything
+  is healthy, nothing is sent. A failure to reach Telegram during the check is
+  reported as a check error, not a confirmed outage.
+
+Required Vercel environment variables (in addition to the existing ones):
+
+- `CRON_SECRET` — a random string (cron authorization).
+- `ADMIN_CHAT_ID` — the Telegram chat id that receives alerts.
+
+Find your chat id by messaging `@userinfobot` on Telegram (it replies with your
+numeric id). Do not use `getUpdates` for this — it conflicts with the webhook.
+
+Safe manual test (does not modify the webhook):
+
+```
+# delivery self-test — sends one harmless message:
+curl -H "Authorization: Bearer $CRON_SECRET" "https://readmood-bot.vercel.app/api/health-check?test=1"
+# real check — returns JSON status, alerts only if a problem is found:
+curl -H "Authorization: Bearer $CRON_SECRET" "https://readmood-bot.vercel.app/api/health-check"
+```
