@@ -226,3 +226,34 @@ The webhook endpoint is:
 - social features
 - personal reading tracker
 - large catalog platform features
+
+## Webhook safety (local development)
+
+Production runs on Vercel via Telegram **webhook**. Long polling and webhooks are
+mutually exclusive: `node-telegram-bot-api` unsets an active webhook when it starts
+polling (HTTP 409 handling in `telegramPolling.js`). Running polling with the
+**production** token therefore deletes the production webhook and takes the live bot
+offline — this caused the 2026-10-13 outage.
+
+Guards now in place:
+
+- Polling is **opt-in**: `src/index.js` refuses to start unless `ALLOW_POLLING=true`.
+  `npm start` stays strict; `npm run dev` sets the flag for convenience.
+- The **production token can never poll**: set `PRODUCTION_BOT_TOKEN_SHA256` to the
+  production token's SHA-256 fingerprint. When the running token matches, polling is
+  hard-refused regardless of `ALLOW_POLLING`. The fingerprint is one-way, so it does
+  not expose the token. Generate it with `npm run token:fingerprint`. This value is
+  only used by local tooling (and CI); the Vercel webhook handler never reads it, so
+  do not add it to Vercel.
+- `npm run delete-webhook` is safe by default: it deletes only when the token is a
+  verified development token (`PRODUCTION_BOT_TOKEN_SHA256` set and not matching).
+  Otherwise — including when no fingerprint is configured — it refuses unless run
+  with `--yes-production`.
+
+Local development should use a **separate development bot** (its own token from
+BotFather), never the production token.
+
+Useful commands:
+
+- `npm run webhook:status` — show the current webhook registration (read-only).
+- `npm run token:fingerprint` — print the SHA-256 fingerprint of the current token.
